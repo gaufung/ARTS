@@ -1,0 +1,8 @@
+.DS_Store
+.md_configs.data
+.me_configs.data
+.sync/
+.z_sync_configs.data
+configs/
+*.log
+template/

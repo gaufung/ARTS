@@ -96,5 +96,79 @@ Linux 文本处理
 
 否定参数，查找非 txt 文件： `find . ! -name "*.txt" -print`
 
+## 3.2 grep
+
+`grep match_pattern file` 按行查找匹配行
+
+- o 输出匹配的文本行
+- v 输出不匹配的文本行
+- c 统计出现的次数
+- i 忽略大小写
+
+## 3.3 xargs
+
+将输入的数据转换为特定命令的命令行参数。
+
+- d 定义定界符
+- n 输出特定的行数
+- I {} 指定替换字符串
+- 0：指定0为输入定界符
+
+## 3.4 sort
+
+`sort -nrk 1 data.txt` 对 `data.txt` 文件排序
+
+- n 数字排序
+- d 字典排序
+- r 逆序排序
+- k N 按照第 N 列排序
+
+## 3.5 uniq
+
+`sort unsort.txt | uniq` 消除重复行
+
+- c 统计出现的次数
+- d 找出重复行
+
+## 3.6 tr
+
+`echo 12345 | tr '0-9' '987654321'` 将 `12345` 转换为 `87654`
+
+**可用的字符**
+
+- alnum：字母和数字
+- alpha：字母
+- digit：数字
+- space：空白字符
+- lower：小写
+- upper：大写
+- cntrl：控制（非可打印）字符
+- print：可打印字符
+
+`echo Linux | tr '[:lower:]' '[:upper:]'` 输出 `LINUX`
+
+## 3.7 cut 
+
+截取文件
+
+- `cut -f2, 4 filename.txt` 截取 2 到 4 列
+- `cut -f2 -d ";" filename.txt` 截取 2 列， 以 `;` 为定界符
+- b 以字节为单位
+- c 以字符为单位
+- f 以字段为单位
+
+## 3.8 paste
+
+将两个文本按照列拼接在一起
+
+`paste file1 file2`
+
+- d 指定定界符
+
+## 3.9 wc
+
+- wc -l file 统计行
+- wc -w file 统计词
+- wc -c file 统计字符
 
 # 4 Share

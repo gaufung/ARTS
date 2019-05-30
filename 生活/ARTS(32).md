@@ -426,9 +426,24 @@ lsof -c <init>
 lsof -p <pid>
 
 **性能监控**
-查看 CPU 使用率
-- sar -u 
-- 
+- sar -u 1 2: 查看 CPU 使用率，每隔 1 秒查看一次，共 2 次；
+- sar -q 1 2: 查看队列中的进程数， 每隔 1 秒查看一次，共 2 次；
+- sar -r 1 2: 查看内存使用， 每隔 1 秒查看一次， 共 2 次；
+- sar -W 1 2: 查看页交换，每一个1 秒查看一次，共 2 次；
+
+**网络工具**
+
+- netstat -a: 列出所有的端口号
+- netstat -at: 列出所有的 tcp 端口号
+- ping <ip>: ping IP 地址
+- traceroute <ip>: 连接 <ip> 经历的路由
+- host <domian>: 查看 IP 
+- host <ip>: 查看域名
+
+**ftp sftp ssh**
+
+- ssh Id@host
+- sftp Id@host
 
 
 

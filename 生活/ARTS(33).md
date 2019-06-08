@@ -225,4 +225,82 @@ func (s *Stack) Empty() bool {
 
 # 3 Tips
 
+**Linux 性能优化**
+
+## 3.1 top 
+
+top 命令可以查看当前系统状态。
+
+```shell
+$top
+    top - 09:14:56 up 264 days, 20:56,  1 user,  load average: 0.02, 0.04, 0.00
+    Tasks:  87 total,   1 running,  86 sleeping,   0 stopped,   0 zombie
+    Cpu(s):  0.0%us,  0.2%sy,  0.0%ni, 99.7%id,  0.0%wa,  0.0%hi,  0.0%si,  0.2%st
+    Mem:    377672k total,   322332k used,    55340k free,    32592k buffers
+    Swap:   397308k total,    67192k used,   330116k free,    71900k cached
+    PID USER      PR  NI  VIRT  RES  SHR S %CPU %MEM    TIME+  COMMAND
+    1 root      20   0  2856  656  388 S  0.0  0.2   0:49.40 init
+    2 root      20   0     0    0    0 S  0.0  0.0   0:00.00 kthreadd
+    3 root      20   0     0    0    0 S  0.0  0.0   7:15.20 ksoftirqd/0
+    4 root      RT   0     0    0    0 S  0.0  0.0   0:00.00 migration/
+```
+
+- 输入 `M`，进程列表按照内存使用大小排序
+- 输入 `P`, 进程列表按照 `CPU` 使用大小排序
+
+第三行显示系统的状态
+
+- %id: 空闲 `CPU` 时间的百分比，如果这个值过低，系统瓶颈在 CPU；
+- %wa: 等待 `I/O` 的 `CPU` 时间百分比，如果这个值过高，表示 `IO` 存在瓶颈。
+
+## 3.2 free 
+
+```shell
+$free
+             total       used       free     shared    buffers     cached
+Mem:        501820     452028      49792      37064       5056     136732
+-/+ buffers/cache:     310240     191580
+Swap:            0          0          0
+```
+
+系统可用内存：`free` + `buffer` + `cached`
+
+## 3.3 iostat
+
+```shell
+$ iostat -d -x -k 1 1
+Device:         rrqm/s   wrqm/s     r/s     w/s    rkB/s    wkB/s avgrq-sz avgqu-sz   await  svctm  %util
+sda               0.02     7.25    0.04    1.90     0.74    35.47    37.15     0.04   19.13   5.58   1.09
+dm-0              0.00     0.00    0.04    3.05     0.28    12.18     8.07     0.65  209.01   1.11   0.34
+dm-1              0.00     0.00    0.02    5.82     0.46    23.26     8.13     0.43   74.33   1.30   0.76
+dm-2              0.00     0.00    0.00    0.01     0.00     0.02     8.00     0.00    5.41   3.28   0.00
+```
+
+- 如果%iowait的值过高，表示硬盘存在I/O瓶颈。
+- 如果 %util 接近 100%，说明产生的I/O请求太多，I/O系统已经满负荷，该磁盘可能存在瓶颈。
+- 如果 svctm 比较接近 await，说明 I/O 几乎没有等待时间；
+- 如果 await 远大于 svctm，说明I/O 队列太长，io响应太慢，则需要进行必要优化。
+- 如果avgqu-sz比较大，也表示有大量io在等待。
+
+## 3.4 pstack
+
+`pstack` 用来跟踪进程栈，输出当前执行的位置。
+
+```shell
+$pstack <pid>
+#0  0x00000039958c5620 in __read_nocancel () from /lib64/libc.so.6
+#1  0x000000000047dafe in rl_getc ()
+#2  0x000000000047def6 in rl_read_key ()
+#3  0x000000000046d0f5 in readline_internal_char ()
+#4  0x000000000046d4e5 in readline ()
+#5  0x00000000004213cf in ?? ()
+#6  0x000000000041d685 in ?? ()
+#7  0x000000000041e89e in ?? ()
+#8  0x00000000004218dc in yyparse ()
+#9  0x000000000041b507 in parse_command ()
+#10 0x000000000041b5c6 in read_command ()
+#11 0x000000000041b74e in reader_loop ()
+#12 0x000000000041b2aa in main ()
+```
+
 # 4 Share

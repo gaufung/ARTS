@@ -267,6 +267,358 @@ The proc filesystem is a pseudo-filesystem which provides an interface to kernel
 
 ## 2.7 C 程序
 
+现在我们需要编写一个脚本或者程序来找到运行进程堆中找到那个要替换的字符串，现在需要对刚刚的简单程序做一点修改让它无限循环打印重复的字符串。
+
+```C
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+/**              
+ * main - uses strdup to create a new string, loops forever-ever
+ *                
+ * Return: EXIT_FAILURE if malloc failed. Other never returns
+ */
+int main(void)
+{
+     char *s;
+     unsigned long int i;
+
+     s = strdup("Holberton");
+     if (s == NULL)
+     {
+          fprintf(stderr, "Can't allocate mem with malloc\n");
+          return (EXIT_FAILURE);
+     }
+     i = 0;
+     while (s)
+     {
+          printf("[%lu] %s (%p)\n", i, s, (void *)s);
+          sleep(1);
+          i++;
+     }
+     return (EXIT_SUCCESS);
+}
+```
+编译和运行上述源代码应该输出无限循环的字符串，直到你杀掉这个进程
+
+```shell
+julien@holberton:~/holberton/w/hackthevm0$ gcc -Wall -Wextra -pedantic -Werror loop.c -o loop
+julien@holberton:~/holberton/w/hackthevm0$ ./loop
+[0] Holberton (0xfbd010)
+[1] Holberton (0xfbd010)
+[2] Holberton (0xfbd010)
+[3] Holberton (0xfbd010)
+[4] Holberton (0xfbd010)
+[5] Holberton (0xfbd010)
+[6] Holberton (0xfbd010)
+[7] Holberton (0xfbd010)
+...
+```
+
+**查看 /proc**
+首先运行 `loop` 程序
+
+```shell
+julien@holberton:~/holberton/w/hackthevm0$ ./loop
+[0] Holberton (0x10ff010)
+[1] Holberton (0x10ff010)
+[2] Holberton (0x10ff010)
+[3] Holberton (0x10ff010)
+...
+```
+
+首先查看这个进程的 `PID`。
+
+```shell
+julien@holberton:~/holberton/w/hackthevm0$ ps aux | grep ./loop | grep -v grep
+julien     4618  0.0  0.0   4332   732 pts/14   S+   17:06   0:00 ./loop
+```
+
+在上述例子中，这个进程的 `PID` 为 `4618`，所以我们要查看的 `maps` 和 `mems` 文件位于 `/proc/4618` 目录下：
+
+- `/proc/4618/maps`
+- `/proc/4618/mem`
+
+这个目录下主要有一下文件
+```shell
+julien@ubuntu:/proc/4618$ ls -la
+total 0
+dr-xr-xr-x   9 julien julien 0 Mar 15 17:07 .
+dr-xr-xr-x 257 root   root   0 Mar 15 10:20 ..
+dr-xr-xr-x   2 julien julien 0 Mar 15 17:11 attr
+-rw-r--r--   1 julien julien 0 Mar 15 17:11 autogroup
+-r--------   1 julien julien 0 Mar 15 17:11 auxv
+-r--r--r--   1 julien julien 0 Mar 15 17:11 cgroup
+--w-------   1 julien julien 0 Mar 15 17:11 clear_refs
+-r--r--r--   1 julien julien 0 Mar 15 17:07 cmdline
+-rw-r--r--   1 julien julien 0 Mar 15 17:11 comm
+-rw-r--r--   1 julien julien 0 Mar 15 17:11 coredump_filter
+-r--r--r--   1 julien julien 0 Mar 15 17:11 cpuset
+lrwxrwxrwx   1 julien julien 0 Mar 15 17:11 cwd -> /home/julien/holberton/w/funwthevm
+-r--------   1 julien julien 0 Mar 15 17:11 environ
+lrwxrwxrwx   1 julien julien 0 Mar 15 17:11 exe -> /home/julien/holberton/w/funwthevm/loop
+dr-x------   2 julien julien 0 Mar 15 17:07 fd
+dr-x------   2 julien julien 0 Mar 15 17:11 fdinfo
+-rw-r--r--   1 julien julien 0 Mar 15 17:11 gid_map
+-r--------   1 julien julien 0 Mar 15 17:11 io
+-r--r--r--   1 julien julien 0 Mar 15 17:11 limits
+-rw-r--r--   1 julien julien 0 Mar 15 17:11 loginuid
+dr-x------   2 julien julien 0 Mar 15 17:11 map_files
+-r--r--r--   1 julien julien 0 Mar 15 17:11 maps
+-rw-------   1 julien julien 0 Mar 15 17:11 mem
+-r--r--r--   1 julien julien 0 Mar 15 17:11 mountinfo
+-r--r--r--   1 julien julien 0 Mar 15 17:11 mounts
+-r--------   1 julien julien 0 Mar 15 17:11 mountstats
+dr-xr-xr-x   5 julien julien 0 Mar 15 17:11 net
+dr-x--x--x   2 julien julien 0 Mar 15 17:11 ns
+-r--r--r--   1 julien julien 0 Mar 15 17:11 numa_maps
+-rw-r--r--   1 julien julien 0 Mar 15 17:11 oom_adj
+-r--r--r--   1 julien julien 0 Mar 15 17:11 oom_score
+-rw-r--r--   1 julien julien 0 Mar 15 17:11 oom_score_adj
+-r--------   1 julien julien 0 Mar 15 17:11 pagemap
+-r--------   1 julien julien 0 Mar 15 17:11 personality
+-rw-r--r--   1 julien julien 0 Mar 15 17:11 projid_map
+lrwxrwxrwx   1 julien julien 0 Mar 15 17:11 root -> /
+-rw-r--r--   1 julien julien 0 Mar 15 17:11 sched
+-r--r--r--   1 julien julien 0 Mar 15 17:11 schedstat
+-r--r--r--   1 julien julien 0 Mar 15 17:11 sessionid
+-rw-r--r--   1 julien julien 0 Mar 15 17:11 setgroups
+-r--r--r--   1 julien julien 0 Mar 15 17:11 smaps
+-r--------   1 julien julien 0 Mar 15 17:11 stack
+-r--r--r--   1 julien julien 0 Mar 15 17:07 stat
+-r--r--r--   1 julien julien 0 Mar 15 17:11 statm
+-r--r--r--   1 julien julien 0 Mar 15 17:07 status
+-r--------   1 julien julien 0 Mar 15 17:11 syscall
+dr-xr-xr-x   3 julien julien 0 Mar 15 17:11 task
+-r--r--r--   1 julien julien 0 Mar 15 17:11 timers
+-rw-r--r--   1 julien julien 0 Mar 15 17:11 uid_map
+-r--r--r--   1 julien julien 0 Mar 15 17:11 wchan
+```
+
+**/proc/pid/maps**
+
+正如我们之前看到的，`/proc/pid/maps` 是文本文件，所以我们可以直接读取它。这个 `maps` 文件内容看上去是这样的的：
+```shell
+julien@ubuntu:/proc/4618$ cat maps
+00400000-00401000 r-xp 00000000 08:01 1070052                            /home/julien/holberton/w/funwthevm/loop
+00600000-00601000 r--p 00000000 08:01 1070052                            /home/julien/holberton/w/funwthevm/loop
+00601000-00602000 rw-p 00001000 08:01 1070052                            /home/julien/holberton/w/funwthevm/loop
+010ff000-01120000 rw-p 00000000 00:00 0                                  [heap]
+7f144c052000-7f144c20c000 r-xp 00000000 08:01 136253                     /lib/x86_64-linux-gnu/libc-2.19.so
+7f144c20c000-7f144c40c000 ---p 001ba000 08:01 136253                     /lib/x86_64-linux-gnu/libc-2.19.so
+7f144c40c000-7f144c410000 r--p 001ba000 08:01 136253                     /lib/x86_64-linux-gnu/libc-2.19.so
+7f144c410000-7f144c412000 rw-p 001be000 08:01 136253                     /lib/x86_64-linux-gnu/libc-2.19.so
+7f144c412000-7f144c417000 rw-p 00000000 00:00 0 
+7f144c417000-7f144c43a000 r-xp 00000000 08:01 136229                     /lib/x86_64-linux-gnu/ld-2.19.so
+7f144c61e000-7f144c621000 rw-p 00000000 00:00 0 
+7f144c636000-7f144c639000 rw-p 00000000 00:00 0 
+7f144c639000-7f144c63a000 r--p 00022000 08:01 136229                     /lib/x86_64-linux-gnu/ld-2.19.so
+7f144c63a000-7f144c63b000 rw-p 00023000 08:01 136229                     /lib/x86_64-linux-gnu/ld-2.19.so
+7f144c63b000-7f144c63c000 rw-p 00000000 00:00 0 
+7ffc94272000-7ffc94293000 rw-p 00000000 00:00 0                          [stack]
+7ffc9435e000-7ffc94360000 r--p 00000000 00:00 0                          [vvar]
+7ffc94360000-7ffc94362000 r-xp 00000000 00:00 0                          [vdso]
+ffffffffff600000-ffffffffff601000 r-xp 00000000 00:00 0                  [vsyscall]
+```
+
+又回到之前讨论的，我们可以看到栈([stack])位于内存的高地址，而堆（[heap])位于内存的低地址。
+
+**[Heap]**
+通过 `maps` 文件，我们可以知道定位字符串所需要的全部信息。
+
+```shell
+010ff000-01120000 rw-p 00000000 00:00 0                                  [heap]
+```
+
+从上面可以知道
+- 堆地址开始的位置为 `0x010ff000` 
+- 堆地址结束的位置为 `0x01120000`
+- 每一个位置都是可以读写的
+
+查看一下我们还在运行的 `loop` 程序 
+```
+...
+[1024] Holberton (0x10ff010)
+...
+```
+从中可以知道 `-> 0x010ff000 < 0x10ff010 < 0x01120000`，这个印证了我们的字符串是分配在堆中，更准确的将，字符串位于堆索引为 `0x10` 的位置。如果我们打开 `/proc/pid/mem` 文件（也就是 `/proc/4618/mem`)，查看内存地址为 `0x10ff10` ，我们可以修改正在运行的程序的堆，覆盖掉 `Holberton` 字符串。
+让我们编写一个脚本程序来完成这件事，可以使用任何你喜欢的编程语言。
+
+## 2.8 覆盖虚拟内存中的字符串
+我们这里使用 Python 3 脚本，但是你可以使用任何你喜欢的语言，下面就是代码
+
+```python
+#!/usr/bin/env python3
+'''             
+Locates and replaces the first occurrence of a string in the heap
+of a process    
+
+Usage: ./read_write_heap.py PID search_string replace_by_string
+Where:           
+- PID is the pid of the target process
+- search_string is the ASCII string you are looking to overwrite
+- replace_by_string is the ASCII string you want to replace
+  search_string with
+'''
+
+import sys
+
+def print_usage_and_exit():
+    print('Usage: {} pid search write'.format(sys.argv[0]))
+    sys.exit(1)
+
+# check usage  
+if len(sys.argv) != 4:
+    print_usage_and_exit()
+
+# get the pid from args
+pid = int(sys.argv[1])
+if pid <= 0:
+    print_usage_and_exit()
+search_string = str(sys.argv[2])
+if search_string  == "":
+    print_usage_and_exit()
+write_string = str(sys.argv[3])
+if search_string  == "":
+    print_usage_and_exit()
+
+# open the maps and mem files of the process
+maps_filename = "/proc/{}/maps".format(pid)
+print("[*] maps: {}".format(maps_filename))
+mem_filename = "/proc/{}/mem".format(pid)
+print("[*] mem: {}".format(mem_filename))
+
+# try opening the maps file
+try:
+    maps_file = open('/proc/{}/maps'.format(pid), 'r')
+except IOError as e:
+    print("[ERROR] Can not open file {}:".format(maps_filename))
+    print("        I/O error({}): {}".format(e.errno, e.strerror))
+    sys.exit(1)
+
+for line in maps_file:
+    sline = line.split(' ')
+    # check if we found the heap
+    if sline[-1][:-1] != "[heap]":
+        continue
+    print("[*] Found [heap]:")
+
+    # parse line
+    addr = sline[0]
+    perm = sline[1]
+    offset = sline[2]
+    device = sline[3]
+    inode = sline[4]
+    pathname = sline[-1][:-1]
+    print("\tpathname = {}".format(pathname))
+    print("\taddresses = {}".format(addr))
+    print("\tpermisions = {}".format(perm))
+    print("\toffset = {}".format(offset))
+    print("\tinode = {}".format(inode))
+
+    # check if there is read and write permission
+    if perm[0] != 'r' or perm[1] != 'w':
+        print("[*] {} does not have read/write permission".format(pathname))
+        maps_file.close()
+        exit(0)
+
+    # get start and end of the heap in the virtual memory
+    addr = addr.split("-")
+    if len(addr) != 2: # never trust anyone, not even your OS :)
+        print("[*] Wrong addr format")
+        maps_file.close()
+        exit(1)
+    addr_start = int(addr[0], 16)
+    addr_end = int(addr[1], 16)
+    print("\tAddr start [{:x}] | end [{:x}]".format(addr_start, addr_end))
+
+    # open and read mem
+    try:
+        mem_file = open(mem_filename, 'rb+')
+    except IOError as e:
+        print("[ERROR] Can not open file {}:".format(mem_filename))
+        print("        I/O error({}): {}".format(e.errno, e.strerror))
+        maps_file.close()
+        exit(1)
+
+    # read heap  
+    mem_file.seek(addr_start)
+    heap = mem_file.read(addr_end - addr_start)
+
+    # find string
+    try:
+        i = heap.index(bytes(search_string, "ASCII"))
+    except Exception:
+        print("Can't find '{}'".format(search_string))
+        maps_file.close()
+        mem_file.close()
+        exit(0)
+    print("[*] Found '{}' at {:x}".format(search_string, i))
+
+    # write the new string
+    print("[*] Writing '{}' at {:x}".format(write_string, addr_start + i))
+    mem_file.seek(addr_start + i)
+    mem_file.write(bytes(write_string, "ASCII"))
+
+    # close files
+    maps_file.close()
+    mem_file.close()
+
+    # there is only one heap in our example
+    break
+```
+现在你可以root权限运行这个脚本，否则没有权限读写这个 `/proc/pid/mem` 文件，哪怕你是这个进程的用户。
+
+运行脚本
+```shell
+julien@holberton:~/holberton/w/hackthevm0$ sudo ./read_write_heap.py 4618 Holberton "Fun w vm!"
+[*] maps: /proc/4618/maps
+[*] mem: /proc/4618/mem
+[*] Found [heap]:
+    pathname = [heap]
+    addresses = 010ff000-01120000
+    permisions = rw-p
+    offset = 00000000
+    inode = 0
+    Addr start [10ff000] | end [1120000]
+[*] Found 'Holberton' at 10
+[*] Writing 'Fun w vm!' at 10ff010
+julien@holberton:~/holberton/w/hackthevm0$ 
+```
+注意这个相应的地址是自动获取的
+- 堆的范围在运行进程虚拟地址 `0x010ff000` 到 `0x01120000`之间；
+- 我们的字符串在索引为 `0x10` 的位置，所以内存地址为 `0x10ff010`。
+
+回到我们的 `loop` 程序，现在它输出了 `fun w vm!`
+
+```shell
+...
+[2676] Holberton (0x10ff010)
+[2677] Holberton (0x10ff010)
+[2678] Holberton (0x10ff010)
+[2679] Holberton (0x10ff010)
+[2680] Holberton (0x10ff010)
+[2681] Holberton (0x10ff010)
+[2682] Fun w vm! (0x10ff010)
+[2683] Fun w vm! (0x10ff010)
+[2684] Fun w vm! (0x10ff010)
+[2685] Fun w vm! (0x10ff010)
+...
+```
+
 # 3 Tips
 
 # 4 Share
+
+职业生涯的七个建议
+
+- （1）不要别人点什么，就做什么：实现一个产品还是不够的，还需要给出反馈，帮助产品的拥有者改进它。
+- （2）推销自己：公司其他人需要明白你的价值，告诉他人你做了什么。
+- （3）学会带领团队：如果带领一个团队，有效地与其他人协同工作，取得更大的成果。
+- （4）生活才是最重要的：将工作和生活分开，只将其当做“工作问题”看待，心平气和地与他人交流。
+- （5）自己找到道路：学会取舍，将时间花在重点的事情上。
+- （6）把自己当成主人：确定自己需要参与的内容。
+- （7）找到水平更高的人。
+  

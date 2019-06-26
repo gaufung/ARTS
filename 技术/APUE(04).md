@@ -138,7 +138,7 @@ int fchmodat(int fd, const char *pathname, mode_t mode, int flag);
 - 拥有此目录
 - 是超级用户
 使用 `ll` 命令查看目录其它用户权限是 `t` 而不是 `[r|w|x]`。
-# 8 `chown`, `fchown`, `fchownat` 和 `lchown` 函数
+# 9 `chown`, `fchown`, `fchownat` 和 `lchown` 函数
 函数原型
 ```c
 #include <unistd.h>
@@ -149,13 +149,13 @@ int lchown(const char *pathname, uid_t owner, gid_t group);
 ```
 可用于修改文件用户 ID 和组 ID，`owner` 和 `group` 任意参数为 `-1`, 则原先所属不变。基于 `BSD` 的系统一直规定只有超级用户可以更改文件的所有者，而 `System V` 则规定任意用户更改拥有者的文件的所有者。
 
-# 9 文件长度
+# 10 文件长度
 `st_size` 字段支队普通文件、目录文件和符号链接有意义。
 - 普通文件为文件大小；
 - 目录文件为一个数的整数倍；
 - 链接文件是*文件名*的实际字节数；
 
-# 10 文件截断
+# 11 文件截断
 函数原型 
 ```c
 # include <unistd.h>
@@ -164,7 +164,7 @@ int ftruncate(int fd, off_t length);
 ```
 将现有文件截断为长度 `length`，如果文件以前大于 `length`, 则 `length` 之外的数据不再被访问；如果之前文件小于 `length`，则文件长度将增加，中间填充 `0` (形成空洞)
 
-# 11 文件系统
+# 12 文件系统
 
 ![](./_image/2019-06-24-06-18-23.jpg?r=63)
 将一个磁盘分成多个分区，每个分区可以包含一个文件系统，节点的是固定长度的记录项，包含文件的大部分信息。
@@ -185,7 +185,7 @@ $ mkdir testdir
 ![](./_image/2019-06-24-07-20-45.jpg?r=61)
 编号 `2549` 的 i 节点，链接数为 2， 来自命名目录 `testdir` 和该目录中的 `.` 项。编号 `1267` 的 i 节点，其类型为一个目录，至少有 3 个链接指向它。在父目录中每一个子目录都会是该父目录的链接计数加一。
 
-# 12 `link`, `linkat`, `unlink`,`unlinkat` 和 `remove`
+# 13 `link`, `linkat`, `unlink`,`unlinkat` 和 `remove`
 函数原型
 ```c
 # incldue <unistd.h>
@@ -201,7 +201,7 @@ int unlinkat(int fd, const char *pathname, int flag);
 ```
 删除这个目录项，并且将 `pathname` 有引用的链接计数减 1。
 
-# 13 `rename` 和 `renameat` 函数
+# 14 `rename` 和 `renameat` 函数
 函数原型
 ```c
 # include <stdio.h>
@@ -212,7 +212,7 @@ int renameat(int oldfd, const char *oldname , int newfd, const char *newname);
 2. 如果 `oldname` 是一个目录，则为目录重命名。如果  `newname` 存在且为空目录，那么删除，然后重命名为 `newname`。注意 `newname` 不能包含 `oldname` 的前缀。
 3. 若 `oldname` 或者 `newname` 引用符号链接，则处理符号链接本身。
 
-# 14 符号链接
+# 15 符号链接
 硬链接指向的是文件的 i 节点，而符号链接是对一个文件的间接指针。
 函数原型
 ```c
@@ -220,7 +220,7 @@ int renameat(int oldfd, const char *oldname , int newfd, const char *newname);
 int symlink(const char *actualpath, const char *sympath);
 int symlinkat(const char *actualpath, int fd, const char *sympath);
 ```
-# 15 文件的时间
+# 16 文件的时间
 - st_atim: 文件数据的最后访问时间
 - st_mtim: 文件数据的最后修改时间
 - st_ctim: i 节点状态最后修改的时间
@@ -234,3 +234,27 @@ int utimensat(int fd, const char *path, const struct timespec times[2], int flag
 `times` 数组参数包含第一个元素包含访问时间，第二元素包含修改时间。
 1. 如果 `times` 参数为空指针，则访问时间和修改时间设置为当前时间；
 2. 如果 `times` 参数指向两个 `timespec` 结构，任一元素的的 `tv_nsec` 字段为 `UTIME_NOW`，相应的时间戳设置为当前时间；`tv_nsec` 字段的值为 `UTIME_OMIT`，则相应的时间保持不变。
+
+# 17 `mkdir`，`mkdirat` 和 `rmdir` 函数
+函数原型 
+```c
+# include <sys/stat.h>
+int mkdir(const char *pathname, mode_t mode);
+int mkdirat(int fd, const char *pathname, mode_t mode);
+```
+对于普通目录，至少有设置执行的权限位。
+
+```c
+# include <unistd.h>
+int rmdir(const char *pathname);
+```
+删除一个空目录，如果目录的链接计数为 `0`, 则释放目录占用的空间。
+
+# 18 `chdir`, `fchdir` 和 `getcwd` 函数
+每个进程都有当前的工作目录，是搜索所有相对路径的起点。使用 `chdir` 和 `fchdir` 函数可以修改当前的工作目录
+```c
+# include <unistd.h>
+int chdir(const char *pathname);
+int fchdir(int fd);
+```
+调用该函数只影响调用它的进程。

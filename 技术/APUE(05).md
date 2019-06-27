@@ -105,3 +105,91 @@ int fputs(const char *restrict str, FILE *restrict fp);
 int puts(const char *str);
 ```
 `fputs` 将以 `null` 字节终止的字符串写到指定流，`puts` 将一个以 `null` 字节终止的字符串写出标准输出。
+
+# 7 二进制 `I/O`
+函数原型
+```c
+# incldue <stdio.h>
+size_t fread(void *restrict ptr, size_t size, size_t nobj, FILE *restrict fp);
+size_t fwrite(const void *restrict ptr, size_t size, size_t nobj, FILE *restrict fp);
+```
+(1) 读写一个二进制数组，浮点数组的 2-5 个元素到文件上
+```c
+float data[10];
+if (fwrite(&data[2], sizeof(float), 4 , fp)  != 4 )
+    err_sys("fwrite error");
+```
+
+(2) 读写一个结构
+```c
+struct {
+    short count;
+    long total;
+    char name[NAMESIZE];
+} item;
+fwrite(&item, sizeof(item), 1, fp);
+```
+
+# 8 定位流
+（1） `ftell` 和 `fseek`
+```c
+# include <stdio.h>
+long ftell(FILE *fp);
+int fseek(FILE *fp, long offset, int whence);
+int rewind(FILE *fp);
+```
+`ftell` 返回当前文件位置指示，`fseek` 定位一个二进制文件，指定字节的 `offset`， `whence` 有三种不同的方式。
+
+（2） `ftello` 和 `fseeko`
+```c
+# include <stdio.h>
+off_t ftello(FILE *fp);
+int fseeko(FILE *fp, off_t offset, int whence);
+```
+
+(3) `fgetpos` 和 `fsetpos` 
+由 `ISO C` 定义，注意跨平台使用
+```c
+# include <stdio.h>
+int fgetpos(FILE *restrict fp, fpos_t *restrict pos);
+int fsetpos(FILE *fp, const rpos_t *pos);
+```
+
+# 9 格式化输出
+总共有 5 个 `printf` 函数来处理
+```c
+# include <stdio.h>
+int printf(const char *restrict format, ...);
+int fprintf(FILE *restrict fp, const char *restrict format, ...);
+int dprintf(int fd, const char *restrict format, ...);
+int sprintf(char *restrict buf, const char *restrict format, ...);
+int snprintf(char *restrict buf, size_t n, const char *restrict format, ...);
+```
+`format` 格式如下
+```
+$[flags][fidwidth][precision][lenmodifier]convertypes
+```
+
+格式化输入：
+```c
+# incldue <stdio.h>
+int scanf(const char *restrict format, ...);
+int fscanf(FILE *restrict fp, const char *restrict format, ...);
+int sscanf(const char *restrict buf, const char *restrict format, ...);
+```
+# 10 内存流
+```c
+# include <stdio.h>
+FILE *fmemopen(void *restrict buf, size_t size, const char *restrict type);
+```
+`buf` 指向缓冲区开始的位置；`size` 参数指定了缓冲区大小的字节数；`type` 控制使用流。
+
+
+```c
+# include <stdio.h>
+FILE *open_memstream(char **bufp, size_t *sizep);
+
+# include <wchar.h>
+FILE *open_wmemstream(wchar_t **bufp, size_t *sizep);
+```
+`open_memstream` 函数创建的流面向字节；`open_wmemstream` 函数创建的流面向宽字节。

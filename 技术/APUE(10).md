@@ -60,3 +60,29 @@ int sigdelset(signset_t *set, int signo);
 int sigismemeber(const signset_t *set, int signo);
 ```
 `sigemptyset` 初始化一个 `set` 集合，清楚所有的信号；`sigfillset` 初始化有 `set` 执行的集合；一旦初始化完毕，可以往集合中添加，删除信号，也可以判断某个信号是否在集合中。
+
+# 8 `sigprocmask` 函数
+函数签名
+```c
+# include <signal.h>
+int sigprocmock(int how, const signset_t *restrict set, sigset_t *restrict oset);
+```
+- 如果 `oset` 是非空指针，则进程当前信号屏蔽字通过 `oset` 返回；
+- 如果 `set` 是非空指针，那么 `how` 参数指示如何修改当前信号屏蔽字；
+    - `SIG_BLOCK` 当前信号屏蔽字和 `set` 指向的屏蔽信号的并集；
+    - `SIG_UNBLOCK` 当前信号屏蔽字和 `set` 指向的屏蔽信号的交集；
+    - `SIG_SETMASK` 新的信号屏蔽字指向 `set`。
+- 如果 `set` 是空指针，则无意义。
+
+# 9 `system` 函数
+`POSIX.1` 要求 `system` 忽略 `SIGINT` 和 `SIGQUIT` 信号， 而阻塞 `SIGCHILD` 信号。
+
+# 10 `sleep` 函数
+函数原型
+```c
+# include <unistd.h>
+unsigned int sleep(unsigned int seconds);
+```
+此函数调用进程会挂起直到
+- 已经过了 `seconds` 所指向的墙上的时钟时间；
+- 调用进程捕获到的一个信号并从信号执行返回。

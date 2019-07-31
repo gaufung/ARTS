@@ -2,7 +2,7 @@
 date: 2019-07-28
 status: public
 tags: APUE
-title: APUE(15）
+title: APUE(14）
 ---
 
 # 1 非阻塞 `I/O`

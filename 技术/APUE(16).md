@@ -1,6 +1,6 @@
 ---
 date: 2019-08-01
-status: public
+status: draft
 tags: APUE
 title: APUE(16）
 ---

@@ -42,40 +42,32 @@ Now you can run command `dotnet new console CalculatorCLI` to create a console a
 
 ```csharp:n
 // program.cs
-using System;
-namespace CalculatorCLI
+static void Main(string[] args)
 {
-    class Program
+    const string WELCOME = "Welcome to Calculator. Feel free to type any expression you want.";
+    const string PROMPT = ">> ";
+    Console.Out.Write(WELCOME + Environment.NewLine);
+    while(true)
     {
-        static void Main(string[] args)
+        Console.Out.Write(PROMPT);
+        try
         {
-            const string WELCOME = "Welcome to Calculator. Feel free to type any expression you want.";
-            const string PROMPT = ">> ";
-            Console.Out.Write(WELCOME + Environment.NewLine);
-            while(true)
+            var input = Console.In.ReadLine();
+            if(string.Compare(input, "exit", StringComparison.OrdinalIgnoreCase) == 0)
             {
-                Console.Out.Write(PROMPT);
-                try
-                {
-                    var input = Console.In.ReadLine();
-                    if(string.Compare(input, "exit", StringComparison.OrdinalIgnoreCase) == 0)
-                    {
-                        break;
-                    }
-                    Console.Out.Write(input);
-                    Console.Out.Write(Environment.NewLine);
-                }
-                catch(Exception e)
-                {
-                    Console.Out.Write("Oops! Something seems to go wrong." + Environment.NewLine);
-                    Console.Out.Write(e.Message);
-                    Console.Out.Write(Environment.NewLine);
-                }
-   
+                    break;
             }
+            Console.Out.Write(input);
+            Console.Out.Write(Environment.NewLine);
         }
-    }
-}
+       catch(Exception e)
+       {
+            Console.Out.Write("Oops! Something seems to go wrong." + Environment.NewLine);
+            Console.Out.Write(e.Message);
+            Console.Out.Write(Environment.NewLine);
+        }
+      }
+  }
 ```
 command: `dotnet run -p Calculator/CalculatorCLI`
 ![](./_image/2019-08-18-14-02-16.jpg)There are nothing mysterious in above pieces of code. Read code from input then write back and what's our job? The lines between #16 and #21 will be filled by our calculator. Here we go.
@@ -87,86 +79,27 @@ Take simplicity into consideration, our calculator only supports integer number,
 `Token` is the basic concept of complie technology. We re-create the source codes into a sequence of tokens. The `Lexer` will take the responsibility for it. First of all, how many kinds of token are in our calculator?
 ```csharp:n
 //Token.cs
-namespace CalculatorCLI.Token
+public enum TokenType
 {
-    /// <summary>
-    /// TokenType
-    /// </summary>
-    public enum TokenType
-    {
-        /// <summary>
-        /// Integer
-        /// </summary>
-        INT,
-
-        /// <summary>
-        /// Plus +
-        /// </summary>
-        PLUS,
-
-        /// <summary>
-        /// Minus -
-        /// </summary>
-        MINUS,
-
-        /// <summary>
-        /// Multiply *
-        /// </summary>
-        MULTIPLY,
-
-        /// <summary>
-        /// Divide /
-        /// </summary>
-        DIVIDE,
-
-        /// <summary>
-        /// Power ^
-        /// </summary>
-        POWER,
-
-        /// <summary>
-        /// left parenthesis "("
-        /// </summary>
-        LPAREN,
-
-        /// <summary>
-        /// right parenthesis ")"
-        /// </summary>
-        RPAREN,
-
-        /// <summary>
-        /// Eof (end of file)
-        /// </summary>
-        EOF,
-
-        /// <summary>
-        /// Illegal token
-        /// </summary>
-        ILLEGAL,
-    }
+    INT,
+    PLUS,
+    MINUS,
+    MULTIPLY,
+    DIVIDE,
+    POWER,
+    LPAREN,
+    RPAREN,
+    EOF,
+    ILLEGAL,
 }
 ```
 Nothing strange, except `EOF` and `ILLEGAL`, they are just talked above section. 
 ```csharp:n
 //Token.cs
-namespace CalculatorCLI.Token
+public class Token
 {
-    //[...]
-    /// <summary>
-    /// Token 
-    /// </summary>
-    public class Token
-    {
-        /// <summary>
-        /// TokenType.
-        /// </summary>
-        public TokenType Type { get; set; }
-
-        /// <summary>
-        /// Token's literal value.
-        /// </summary>
-        public string Literal { get; set; }
-    }
+    public TokenType Type { get; set; }
+    public string Literal { get; set; }
 }
 ```
 `Token` class is quite simple, including two properties. `Literal` including the token literal value in the source code.
@@ -174,95 +107,44 @@ The next step is to build our lexer, which just only includes one feature: `Next
 Before we move forward, we should expect what we'll get. Here are unit tests for the `Lexer` implementation, just like TDD(`Test Drive Development`). Use `dotnet new nunit CalculatorTest` command to create `NUnit` test framwork then `dotnet add CalculatorTest.csproj reference CalculatorCLI.csproj`。
 ```csharp:n
 // LexerTest.cs
-namespace CalculatorTest.Lexer
+[Test]
+public void TestLexerNextToken()
 {
-    using NUnit.Framework;
-
-    using CalculatorCLI.Lexer;
-
-    using CalculatorCLI.Token;
-
-    [TestFixture]
-    public class LexerTest
-    {
-       [Test]
-       public void TestLexerNextToken()
-       {
-            string input = @"1 + 2 * (12 - 6) / 3 + 2 ^ 3
+    string input = @"1 + 2 * (12 - 6) / 3 + 2 ^ 3
 + ((4+3) *   4)
 / 4
 ";
 
-            var tests = new[]
-            {
-                new Token {Type = TokenType.INT, Literal="1"},
-                new Token {Type = TokenType.PLUS, Literal="+"},
-                new Token {Type = TokenType.INT, Literal="2"},
-                new Token {Type = TokenType.MULTIPLY, Literal="*"},
-                new Token {Type = TokenType.LPAREN, Literal="("},
-                new Token {Type = TokenType.INT, Literal="12"},
-                new Token {Type = TokenType.MINUS, Literal="-"},
-                new Token {Type = TokenType.INT, Literal="6"},
-                new Token {Type = TokenType.RPAREN, Literal=")"},
-                new Token {Type = TokenType.DIVIDE, Literal="/"},
-                new Token {Type = TokenType.INT, Literal="3"},
-                new Token {Type = TokenType.PLUS, Literal="+"},
-                new Token {Type = TokenType.INT, Literal="2"},
-                new Token {Type = TokenType.POWER, Literal="^"},
-                new Token {Type = TokenType.INT, Literal="3"},
-                new Token {Type = TokenType.PLUS, Literal="+"},
-                new Token {Type = TokenType.LPAREN, Literal="("},
-                new Token {Type = TokenType.LPAREN, Literal="("},
-                new Token {Type = TokenType.INT, Literal="4"},
-                new Token {Type = TokenType.PLUS, Literal="+"},
-                new Token {Type = TokenType.INT, Literal="3"},
-                new Token {Type = TokenType.RPAREN, Literal=")"},
-                new Token {Type = TokenType.MULTIPLY, Literal="*"},
-                new Token {Type = TokenType.INT, Literal="4"},
-                new Token {Type = TokenType.RPAREN, Literal=")"},
-                new Token {Type = TokenType.DIVIDE, Literal="/"},
-                new Token {Type = TokenType.INT, Literal="4"},
-                new Token {Type = TokenType.EOF, Literal=""},
-            };
-            Lexer lexer = new Lexer(input);
-            foreach (var tt in tests)
-            {
-                var actualToken = lexer.NextToken();
-                Assert.AreEqual(tt.Type, actualToken.Type, $"expect TokenType {tt.Type}, got {actualToken.Type}");
-                Assert.AreEqual(tt.Literal, actualToken.Literal, $"expect Token's Literal {tt.Literal}, got {actualToken.Literal}");
-            }
-       }
+    var tests = new[]
+    {
+        new Token {Type = TokenType.INT, Literal="1"},
+        new Token {Type = TokenType.PLUS, Literal="+"},
+        new Token {Type = TokenType.INT, Literal="2"},
+        new Token {Type = TokenType.MULTIPLY, Literal="*"},
+        new Token {Type = TokenType.LPAREN, Literal="("},
+       //....
+    };
+    Lexer lexer = new Lexer(input);
+    foreach (var tt in tests)
+    {
+        var actualToken = lexer.NextToken();
+        Assert.AreEqual(tt.Type, actualToken.Type, $"expect TokenType {tt.Type}, got {actualToken.Type}");
+       Assert.AreEqual(tt.Literal, actualToken.Literal, $"expect Token's Literal {tt.Literal}, got {actualToken.Literal}");
     }
 }
 ```
 It chooses `table-driven` unit test pattern. The `Lexer` takes in a string input and invokes `NextToken` once a time to generate a token. Compre this token with expect one. 
 ```csharp:n
 // Lexer.cs
-namespace CalculatorCLI.Lexer
+public class Lexer
 {
-    using Token;
-    public class Lexer
+    //...
+    public Token NextToken()
     {
-        private readonly string input;
-        private int position;
-
-        public Lexer(string input)
+        //...
+        char character = this.input[this.position];
+        switch (character)
         {
-            this.input = input;
-            this.position = 0;
-        }
-
-        public Token NextToken()
-        {
-            this.SkipWhitespace();
-            if (this.position >= this.input.Length)
-            {
-                return new Token { Type = TokenType.EOF, Literal=""};
-            }
-            Token token = null;
-            char character = this.input[this.position];
-            switch (character)
-            {
                 case '+':
                     token = new Token { Type = TokenType.PLUS, Literal = "+" };
                     break;
@@ -272,18 +154,7 @@ namespace CalculatorCLI.Lexer
                 case '*':
                     token = new Token { Type = TokenType.MULTIPLY, Literal = "*" };
                     break;
-                case '/':
-                    token = new Token { Type = TokenType.DIVIDE, Literal = "/" };
-                    break;
-                case '^':
-                    token = new Token { Type = TokenType.POWER, Literal = "^" };
-                    break;
-                case '(':
-                    token = new Token { Type = TokenType.LPAREN, Literal = "(" };
-                    break;
-                case ')':
-                    token = new Token { Type = TokenType.RPAREN, Literal = ")"};
-                    break;
+               // ...
                 default:
                     if(IsDigit(character))
                     {
@@ -298,34 +169,348 @@ namespace CalculatorCLI.Lexer
             }
             this.position++;
             return token;
-        }
-        private void SkipWhitespace()
+}
+```
+The `Lexer` has only two fileds: `input` and `position`. The `position` points to the current character in the `input`. According to the pointing character, it returns the corresponding `Token`. It is pretty straight, isn't it?
+
+## 3.2 AST
+AST(Abstract Syntax Tree) is primary concept in the compile, also equivalent  in our calculator.  As we all know, various operators have their precedences respectively.  $1 + 2 \times 3 $  equals $7$, rather than $9$, because of  higher priority of   `multiply` operator. Internally, how will our calculator represents this expression? 
+
+![](./_image/2019-08-24-09-48-53.jpg?r=56)
+Above illustration tells what the AST looks like. $2 \times 3$  expression seems has lower position. So this expression should be calcluated firstly, which is we expected. Beside the original priorities of operators, the parenthess could *leverage*  their ones. For example, now $(1 + 2) \times 3$'s result is $9$.  Here is the AST. 
+![](./_image/2019-08-24-09-59-09.jpg?r=57)
+Here is the question: 
+> How can we build such a AST according to the given expression ?
+
+Firstly, *Expression* is abstract entity in the AST. Every part of the AST, even the whole  is considered as an *Expression*.  Let take above illustration for example. 
+- Leaf with $1$: it represents the an integer expresion. Here, we call it *IntegerLiteralExpression*;
+- Left subtree, including  leaves $1$ and $2$ with opeator $+$:  It alse can be considered as *Expression* and now it is *InfixExpression*. 
+- The whole tree: It is still an *Expression*, even an *InfixExpression*. But this time, its left branch is another *InfixExpression* and the right branch is *IntegerLiteralExpression*. 
+
+Beside above two kinds expression, there is addtional expression callled *PrefixExpression*.  `-1` is an example. We think prefix `-` as a prefix of the *IntegerLiteralExpression*. 
+Time to go, let's define AST's components. 
+```csharp:n
+//Expression.cs
+public abstract class Expression
+{
+    public abstract string TokenLiteral();
+}
+//IntegerExpression.cs
+public class IntegerExpression : Expression
+{
+    public Token Token { get; set; }
+    public long Value { get; set; }
+   //...
+    public override string ToString()
+    {
+        return $"{Value}";
+    }
+}
+// PrefixExpression.cs
+public class PrefixExpression : Expression
+{
+    public Token Token { get; set; }
+    public Expression Right { get; set; }
+    public string Operator { get; set; }
+    public override string ToString()
+    {
+        return $"({Token.Literal} {Right.ToString()})";
+    }
+}
+//InfixExpression.cs
+public class InfixExpression : Expression
+{
+    public Expression Left { get; set; }
+    public Expression Right { get; set; }
+    public Token Token { get; set; }
+    public string Operator { get; set; 
+    public override string ToString()
+    {
+        return $"({Left.ToString()} {Token.Literal} {Right.ToString()})";
+    }
+}
+```
+
+## 3.3 Parser
+Everything is ready, we're going to **PARSE** our input expression into AST's *expression*. So many kinds of parser in our toolbox and we choose *Pratt* method, which was first invented by [Vaughan Pratt](https://en.wikipedia.org/wiki/Vaughan_Pratt)'s paper [Top Down Operator Precedence](https://tdop.github.io/).  However, this article doesn't cover the topic about why this method works but just follow how it works. 
+As metioned above, every operator has its own precedence. 
+```csharp:n
+//Pecedence.cs
+public enum Precedence
+{
+    LOWEST = 0,
+    SUM = 1,
+    PRODUCT = 2,
+    PREFIX = 3,
+    POWER = 4,
+    GROUP = 5,
+}
+//Parser.cs
+public class Parser
+{
+    //...
+    private static IDictionary<TokenType, Precedence> _precedences = new Dictionary<TokenType, Precedence>
+    {
+        {TokenType.PLUS, Precedence.SUM},
+        {TokenType.MINUS, Precedence.SUM},
+        {TokenType.MULTIPLY, Precedence.PRODUCT},
+        {TokenType.DIVIDE, Precedence.PRODUCT},
+        {TokenType.POWER, Precedence.POWER},
+        {TokenType.LPAREN, Precedence.GROUP}
+    };
+    //...
+}
+```
+Almost  every token is related to one or more parse functions, which depends on the position of token.  For example, if `-` exists in the head of expression, it is considered as a `PrefixExpression`. In any other cases, it is `InfixExpression`. 
+```csharp:n
+// Parser.cs
+public  class Parser
+{
+    //...
+    private IDictionary<TokenType, Func<Expression>> PrefixFns;
+    private IDictionary<TokenType, Func<Expression, Expression>> InfixFns;
+    
+    public Parser()
+    {
+        //...
+        PrefixFns = new Dictionary<TokenType, Func<Expression>>();
+        InfixFns = new Dictionary<TokenType, Func<Expression, Expression>>();
+        RegisterPrefix(TokenType.INT, this.ParseIntegerLiteral);
+        RegisterPrefix(TokenType.MINUS, this.ParsePrefixExpression);
+        RegisterPrefix(TokenType.LPAREN, this.ParseGroupExpression);
+        RegisterInfix(TokenType.PLUS, this.ParseInfixExpression);
+        RegisterInfix(TokenType.MINUS, this.ParseInfixExpression);
+        RegisterInfix(TokenType.MULTIPLY, this.ParseInfixExpression);
+        RegisterInfix(TokenType.DIVIDE, this.ParseInfixExpression);
+        RegisterInfix(TokenType.POWER, this.ParseInfixExpression);
+    }
+}
+```
+The next is the highlight of *Pratt* method. 
+```csharp:n
+// Parser.cs
+public class Parser
+{
+    //...
+    public Expression Parse()
+    {
+        return this.ParseExpression(Precedence.LOWEST);
+    }
+    private Expression ParseExpression(Precedence precedence)
+    {
+        if(this.PrefixFns.ContainsKey(this._currentToken.Type))
         {
-            while(this.position < this.input.Length && IsWhitespace(this.input[this.position]))
+            Func<Expression> prefixFn = this.PrefixFns[this._currentToken.Type];
+            Expression leftExp = prefixFn();
+            while(!this.PeekTokenIs(TokenType.EOF) && precedence < this.PeekTokenPrecedence())
             {
-                this.position++;
+                if(this.InfixFns.ContainsKey(this._peekToken.Type))
+                {
+                    Func<Expression, Expression> infixFn = this.InfixFns[this._peekToken.Type];
+                    this.ReadNextToken();
+                    leftExp = infixFn(leftExp);
+                }
+                else
+                {
+                    return leftExp;
+                }
             }
+            return leftExp;
         }
-        private string ReadNumber()
+        else
         {
-            int position = this.position;
-            while(this.position < this.input.Length && IsDigit(this.input[this.position]))
-            {
-                this.position++;
-            }
-            string number = this.input.Substring(position, this.position - position);
-            this.position--;
-            return number;
+            throw new Exception($"{this._currentToken.Type} doesn't has corresponding parse function");
         }
-        private static bool IsDigit(char character)
+    }
+    private Expression ParseIntegerLiteral()
+    {
+        return new IntegerExpression
         {
-            return character >= '0' && character <= '9';
-        }
-        private static bool IsWhitespace(char character)
+            Token = this._currentToken,
+            Value = long.Parse(this._currentToken.Literal)
+        };
+    }
+    private Expression ParsePrefixExpression()
+    {
+        PrefixExpression exp = new PrefixExpression();
+        exp.Token = this._currentToken;
+        exp.Operator = this._currentToken.Literal;
+        this.ReadNextToken();
+        exp.Right = this.ParseExpression(Precedence.PREFIX);
+        return exp;
+    }
+    private Expression ParseGroupExpression()
+    {
+        this.ReadNextToken();
+        Expression exp = this.ParseExpression(Precedence.LOWEST);
+        this.ExpectPeekToken(TokenType.RPAREN);
+        return exp;
+    }
+    private Expression ParseInfixExpression(Expression left)
+    {
+        InfixExpression exp = new InfixExpression
         {
-            return ' ' == character || '\t' == character || '\n' == character || '\r' == character;
+            Left = left,
+            Token = this._currentToken,
+            Operator = this._currentToken.Literal,
+        };
+        Precedence precedence = _precedences[this._currentToken.Type];
+        this.ReadNextToken();
+        exp.Right = this.ParseExpression(precedence);
+        return exp;
+    }
+    //...
+}
+```
+`ParseExpression` is the key method. It takes `Precedences` parameter.  Firstly, it try to parse out a prefix expression. In most cases, it's `IntegerLiteralExpression` or  a `minus` prefix. Then it compares current precedence with  peek token's precedences. If less than, so it means the right infix operator has lower position in the AST. And the parsed expression should act as like left branch in this infix expression rather than preivous  expression component. 
+Thanks to well defined precedences and related parse methods by the token type, the `while` statement can go through until meets the an `EOF`.  
+Here is the unit test for parser. 
+```csharp:n
+// ParserTest.cs
+[TestFixture]
+public class ParserTest
+{
+    //...
+    [Test]
+    public void TestParser()
+    {
+        var tests = new []
+        {
+            new ParserTestCase("1+ 2", "(1 + 2)"),
+            new ParserTestCase("1 + 2 - 3", "((1 + 2) - 3)"),
+            new ParserTestCase("10 - 12 * 12", "(10 - (12 * 12))"),
+            new ParserTestCase("16 / 4 ^ 2", "(16 / (4 ^ 2))"),
+            new ParserTestCase("(5 - 2) * 3", "((5 - 2) * 3)"),
+            new ParserTestCase(" 5 +((12 + 8) / 4))", "(5 + ((12 + 8) / 4))"),
+            new ParserTestCase("-4 * 5 + 2", "(((- 4) * 5) + 2)"),
+            new ParserTestCase("5 + -3", "(5 + (- 3))"),
+        };
+        foreach(var tt in tests)
+        {
+            var parser = new Parser(new Lexer(tt.Input));
+            var expression = parser.Parse();
+            Assert.AreEqual(tt.Expected, expression.ToString(), $"Expression want = {tt.Expected}, but got {expression.ToString()}");
         }
     }
 }
 ```
-The `Lexer` has only two fileds: `input` and `position`. The `position` points to the current character in the `input`. According to the pointing character, it returns the corresponding `Token`. It is pretty straight, isn't it?
+## 3.4 Evalution
+Now that we use parser to get an expression to represent the AST. It quite nature to get the value of this AST and this is called evalution phrase.  There is only one kind of operand (integer) so we just need just one entity in the object system. 
+```csharp:n
+// Object.cs
+public abstract class Object
+{
+    public abstract ObjectType Type();
+    public abstract string Inspect();
+}
+// IntegerObject.cs
+public class IntegerObject : Object
+{
+    public long Value { get; set; }
+    public override string Inspect()
+    {
+        return $"{Value}";
+    }
+    public override ObjectType Type()
+    {
+        return ObjectType.INTEGER;
+    }
+}
+```
+Evalution progress is quite straigthforward. It accepts the expression which is generated by the parser and uses corresponding methods to handle the expression. Because expression may be nested, so we call the eval method recursively. 
+```csharp:n
+// Evalutor.cs
+public class Evaluator
+{
+    public static Object.Object Eval(Expression expression)
+    {
+        if(expression is AST.IntegerExpression)
+        {
+            return new Object.IntegerObject { Value = ((IntegerExpression)expression).Value };
+        }
+        if(expression is AST.PrefixExpression)
+        {
+            return EvalPrefixExpression(expression as AST.PrefixExpression);
+        }
+        if(expression is AST.InfixExpression)
+        {
+            return EvalInfixExpression(expression as AST.InfixExpression);
+        }
+        throw new Exception($"Unsupported expression {expression.TokenLiteral()}");
+    }
+    public static Object.Object EvalPrefixExpression(AST.PrefixExpression expression)
+    {
+        Object.Object right = Eval(expression.Right);
+        Object.IntegerObject rightInteger = right as Object.IntegerObject;
+        if(rightInteger == null)
+        {
+            throw new Exception("Prefix expression right is not Object.IntegerObject");
+        }
+        return new Object.IntegerObject { Value = -1 * rightInteger.Value };
+    }
+
+    public static Object.Object EvalInfixExpression(AST.InfixExpression expression)
+    {
+        Object.Object left = Eval(expression.Left);
+        Object.IntegerObject leftInteger = left as Object.IntegerObject;
+        if(leftInteger == null)
+        {
+            throw new Exception("Infix expression left branch is not Object.IntegerObject");
+        }
+        Object.Object right = Eval(expression.Right);
+        Object.IntegerObject rightInteger = right as Object.IntegerObject;
+        if(rightInteger == null)
+        {
+            throw new Exception("Infix expression right branch is not Object.IntegerObject");
+        }
+        return InfixExpression(leftInteger, expression.Operator, rightInteger);
+    }
+    public static Object.Object InfixExpression(Object.IntegerObject left, string op, Object.IntegerObject right)
+    {
+        if(op == "+")
+        {
+            return new Object.IntegerObject { Value = left.Value + right.Value };
+        }
+        if(op == "-")
+        {
+            return new Object.IntegerObject { Value = left.Value - right.Value };
+        }
+        if(op == "*")
+        {
+            return new Object.IntegerObject { Value = left.Value * right.Value };
+        }
+        if(op == "/")
+        {
+            return new Object.IntegerObject { Value = left.Value / right.Value };
+        }
+        if(op == "^")
+        {
+            return new Object.IntegerObject { Value = (long)Math.Pow((double)left.Value, (double)right.Value) };
+        }
+        throw new Exception($"Unsupported arithmetic operator {op}");
+    }
+}
+```
+Well done, we finally get what we want after a loooong journey. We now hold the `Object.Integer` object to represent the result of input arthmetic expression.  Let's go back to our `Main` method to finish left work. 
+
+# 4 CLI
+In the `Main` method, we take in the user input, create a lexer, pass to Parser 's construtor, call parse method to get the AST expression, use Eval static method to get result, and print the result's Inspect ouput. 
+```csharp:n
+// program.cs
+static void Main(string[] args)
+{
+    var lexer = new Lexer.Lexer(input);
+    var parser = new Parser.Parser(lexer);
+    var expression = parser.Parse();
+    var result = Evaluate.Evaluator.Eval(expression);
+    Console.Out.Write(result.Inspect());
+}
+```
+
+![](./_image/2019-08-24-19-14-05.jpg)
+
+Awesome!  
+We create a basic calculator from  nothing but language basic data structure.  Enjoy it.
+
+[Source Code](https://github.com/gaufung/Calculator)
+

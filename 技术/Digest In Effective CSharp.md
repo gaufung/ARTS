@@ -153,3 +153,128 @@ public class Foo : IEquatable<Foo>
 1. If two objects are equal, they must generate the same hash value.
 2. For any object A, A.GetHashCode() must be an instance invariant. No matter what methods are called on A. 
 3. The hash function should generate a random distribute among all integer for all input.
+
+
+# 5 Use Optional Parameters to Minimize Method Overides.
+
+Named parameters mean that in any API with default parameters, you only need to specify those parameters you intend to use.
+
+# 5 Understand the Attraction of Small Functions
+
+Instead of JITing your entire application when it starts, the CLR invokes the JITer on a funciton-by-function basis.
+
+```csharp
+public string BuildMsg(bool takeFirstPath)
+{
+    StringBuilder msg = new StringBuilder();
+    if(takeFirstPath)
+    {
+        msg.Append("something");
+        msg.Append("\nThis is a problem");
+        msg.Append("imagine much more text");
+    }
+    else
+    {
+        msg.Append("this path is not so bad");
+        msg.Append("\nThis is a problem");
+        msg.Append("imagine much more text");
+    }
+    return msg.ToString();
+}
+```
+When the BuildMsg get called, both path are JITed, but only one is needed. You can change it this way.
+
+```csharp
+public string BuildMsg2(bool takeFirstPath)
+{
+    if(takeFirstPath)
+    {
+        return FirstPath();
+    }
+    else
+    {
+        return SecondPath();
+    }
+} 
+```
+Small functions mean that the JIT compiler compiles the logic that's needed, not lengthy sequences of code that won't be used immediately.
+
+Note:
+The C# compiler generates the IL for echa method, and the JIT compiler translates that IL into the machine code on the destination machine.
+
+
+# 6 Prefer Member Initializer to Assignment Statements
+
+Constructing member variable when you declare that variable is natural in C#
+
+```csharp
+public class MyClass
+{
+    private List<string> labels = new List<string>();
+}
+```
+
+# 7 Use Proper Initialization for Static Class Member
+
+```csharp
+public class MySingleton
+{
+    private static readonly MySingleton theOneAndOnly;
+
+    static MySingleton
+    {
+        try
+        {
+            theOneAndOnly = new MySingleton();
+        }
+        catch
+        {
+            // elided
+        }
+       
+    }
+
+    public static MySingleton TheOnly
+    {
+        get { return theOneAndOnly; }
+    }
+
+    private MySingleton()
+    {
+
+    }
+}
+```
+The CLR calls your static constructor automatically before your type is first accessed in an application space(an AppDomain). Using static constructor helps you handle unexpected exceptions.
+
+
+ # 8 Minimize Duplicate Initialization Logic
+
+ Constructor initializier allow one constructor to call another constructor.
+
+ ```csharp
+ public class MyClass
+ {
+     private List<ImportantData> coll;
+
+     private string name;
+
+     public MyClass() : this(0, "")
+     {
+
+     }
+
+     public MyClass(int initialCount):this(initialCount, string.Empty)
+     {
+
+     }
+
+     public MyClass(int initialCount, string name)
+     {
+         coll = (initialCount > 0) ? new List<ImportantData>(initialCount): new List<ImportatnData>();
+         this.name = name;
+     }
+ }
+ ```
+
+ 

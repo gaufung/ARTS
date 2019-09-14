@@ -277,4 +277,75 @@ The CLR calls your static constructor automatically before your type is first ac
  }
  ```
 
+# 9 Avoid Creating Unnecessary Objects.
+
+All reference types, even local variables are allocated on the heap. Every local variable of a reference type becomes garbage as soon as that function or method exits.
+
+```csharp
+protected override void OnPaint(PaintEventArgs e)
+{
+    using(Font myFont = new Font("Arial", 10.0f))
+    {
+        e.Graphics.DrawString(DateTime.Now.ToString(), MyFont, Brushes.Black, new PointF(0,0));
+    }
+    base.OnPaint(e);
+}
+```
+
+`OnPaint()` gets called frequently. Every time it gets called, you create another Font object that contains the exact settings. You should promote the Font object from a local variable to member variable.
+
+```csharp
+private readonly Font myFont = new Font("Arial", 10.0f);
+
+/// elied
+```
  
+Creating static member variable for commonly used used instance of the reference type you need is best practice.
+
+
+# 10 Implement the Standard Dispose Pattern
+
+The implementation of your `IDisposable.Dispose()` method is responsible for four tasks.
+
+1. Freeing the unmanaged resources;
+2. Freeing all managed resources(including unhooking events);
+3. Settings a state flag to indicate the object has been disposed. 
+4. Supressing finalization. You can call `GC.SuppressFinalize(this)` to accomplish this task.
+
+
+# 11 Disinguish Between Value Types and Reference Types
+
+- Value types are not polymorphic. They are better suited to storing the data that your application manipulates 
+- Reference types can be polymorphic and should be used to define the behavior of your application.
+
+```csharp
+MyType[] arrayOfTypes = new MyType[100];
+```
+If `MyType` is value type, one allocation 100 times the size of `MyType` object occurs. However if MyType is reference type, one allocation just occurs and every element of the array is null. When you initialize each elements in the array, you will have performaned 101 allocations. 
+
+
+# 12 Make Sure That 0 Is a Valid State for Value Types
+
+All `enums` are derived from `System.ValueType` 
+
+```csharp
+public enum Planet
+{
+    Mercury = 1,
+    Vernus = 2,
+    Earth = 3,
+    Mars = 4
+}
+```
+If `Planet sphere = new Planet()`, what does `sphere` means? 0 is not valid value.
+
+```csharp
+public enum Planet
+{
+    None = 0,
+    Mercury = 1,
+    Earch = 3,
+    //elided
+}
+```
+

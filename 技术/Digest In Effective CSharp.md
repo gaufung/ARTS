@@ -1,6 +1,6 @@
 ---
-date: 2010-09-10
-status: draft
+date: 2019-09-10
+status: public
 title: Digest in Effective C#
 ---
 
@@ -247,10 +247,8 @@ public class MySingleton
 ```
 The CLR calls your static constructor automatically before your type is first accessed in an application space(an AppDomain). Using static constructor helps you handle unexpected exceptions.
 
-
- # 8 Minimize Duplicate Initialization Logic
-
- Constructor initializier allow one constructor to call another constructor.
+# 8 Minimize Duplicate Initialization Logic
+Constructor initializier allow one constructor to call another constructor.
 
  ```csharp
  public class MyClass
@@ -349,3 +347,125 @@ public enum Planet
 }
 ```
 
+# 13 Limit Visibility of Your Types
+
+Many standalong classes that you create should be internal. You can further limit visibility by creating proected or private classes nested inside your original class.
+
+```csharp
+public class List<T> : IEnumerable<T>
+{
+    private class Enumerator<T> : IEnumberator<T>
+    {
+        public Enumerator(List<T> storage)
+        {
+            //elided
+        }
+    }
+    public IEnumberator<T> GetEnumberator()
+    {
+        return new Enumerator(this);
+    }
+}
+```
+The users of `List<T>` never know about the `Enumerator<T>` class which implement the `IEnumbertor<T>`.
+
+# 14 Prefer Defining and Implementing Interfaces to Inheritance
+- Interfaces are a way to design by contract.
+- Abstract base classes provide a common abstraction for a set of related types.
+
+# 15 Avoid Returning References to Internal Class Objects
+
+If you create a property that returns a reference type, the caller can access any public member of that object, including those that modify the state of the property.
+
+```csharp
+public class MyBusinessObject
+{
+    private BindingList<ImportantData> listOfData = new BindingList<ImportantData>();
+
+    public BindingList<ImportantData> Data => this.listOfData;
+}
+```
+
+Solutions
+1. Value Type: They are copied when client access them through a property.
+2. Immuntable Type: Such as `System.String` or any immutable type.
+3. Inteface: Allow client to access a subset of your internal member's funcitonally. 
+4. Provide a wrapper object: Expose an instance of the wrapper.
+
+# 16 Support Generic Covariance and Contravariance
+- A return type is covariant if you can substitute more derived than the type declared.
+- A parameter type is contravariant if you can substitute a more base parameter type than the type declared. 
+
+In all OOP language generally support covariance of parameter types. You can pass an object of derived type to any method that expects a more base type. But generics would not follow the same rules. 
+
+```csharp
+/*
+public delegate TResult Func<out TResult>();
+public delegate void Action<in T>(T arg);
+*/
+
+public static Func<string> GetFunc()
+{
+    return () => "Hello World";
+}
+
+public static void SetAction(Action<object> action)
+{
+    action("Effective C#");
+}
+
+
+public static void Main()
+{
+    Func<object> result = GetFunc();
+    Console.WriteLine(result()); // "Hello World"
+
+    Action<string> act = (str) => Console.WriteLine(str);
+    SetAction(act); // Effective C#
+}
+```
+
+
+# 17 Use the `new` Modifier Only to React to Base Class Updates
+
+Using the `new` modifier on a class member to redefine a nonvirtual member inherited from a base class. Just because you can do something doesn't mean you should.
+
+```csharp
+public class MyClass
+{
+    public void MagicMethod()
+    {
+        //details elided
+    }
+}
+
+public class MyOtherClass : MyClass
+{
+    public new void MagicMethod()
+    {
+        //detailes elided.
+    }
+}
+
+object c = MakeObject();
+
+MyClass cl = c as MyClass;
+c1.MagicMethod(); // call through MyClass reference.
+
+MyOtherClass cl2 = c as MyOtherClass;
+cl2.MagicMethod(); // call through MyOtherClass reference.
+```
+
+
+# 18 Minimize Boxing and Unboxing
+Boxing and unboxing are necessary for you to use value types where the `System.Object` is expected. 
+
+```csharp
+Console.WriteLine("A few numbers:{0}, {1}, {2}", 25, 32, 50);
+```
+
+`Console.WriteLine` takes an array of `System.Object` references. However `ints` are value types and must be boxed so that they be passed to this overload of the Writelinte method.
+
+```csharp
+Console.WriteLine("A few numbers:{0}, {1}, {2}", 25.ToString(), 32.ToString(), 50.ToString());
+```

@@ -169,10 +169,172 @@ public class MyBenchmark
 ### 1.1.4 其他功能
 - 可以指定不同的 runtime，比如 .net framework, coreclr 或者 mono
 - 可以从编译好 assembly, exe 等运行 Benchmark.
-- 运行的方法必须要由返回值，否则被编译器优化
+- 运行的方法必须要有返回值，否则被编译器优化
 
 
 # 2 避免内存分配
+
+## 2.1 值类型
+
+和 Java 语言不同，用户自定义类型除了引用类型（class)，用户还可以定义值类型（struct)。对于值类型，很多人都存在这样这样的误解：
+
+> 值类型分配在栈上，而引用类型定义分配在堆上
+
+但是在所有的官方文档中并没有明确说明阻止在堆上分配值类型，除了自定义值类型，还有基础类型也是值类型，比如 `int`, `double` 和枚举类型等等。
+
+下面代码为值类型和引用类型使用示例
+
+```C#
+class Program
+{
+    static void Main(string[] args)
+    {
+        DataStruct data1 = new DataStruct(){Age=20, Salary = 10.0};
+        DataClass data2= new DataClass(){Age=20, Salary=10.0};
+    }
+}
+struct DataStruct
+{
+    public int Age;
+    public double Salary;
+}
+class DataClass
+{
+    public int Age;
+    public double Salary;
+}
+```
+
+使用 `dnSpy` 工具查看生成的 IL 代码
+
+```IL:n
+		/* (8,9)-(8,10) C:\Users\fenga\workspace\DotNetMemoryBenchmark\StructVsClass\Program.cs */
+		/* 0x0000025C 00           */ IL_0000: nop
+		/* (9,14)-(9,73) C:\Users\fenga\workspace\DotNetMemoryBenchmark\StructVsClass\Program.cs */
+		/* 0x0000025D 1202         */ IL_0001: ldloca.s  V_2
+		/* 0x0000025F FE1503000002 */ IL_0003: initobj   StructVsClass.DataStruct
+		/* 0x00000265 1202         */ IL_0009: ldloca.s  V_2
+		/* 0x00000267 1F14         */ IL_000B: ldc.i4.s  20
+		/* 0x00000269 7D01000004   */ IL_000D: stfld     int32 StructVsClass.DataStruct::Age
+		/* 0x0000026E 1202         */ IL_0012: ldloca.s  V_2
+		/* 0x00000270 230000000000002440 */ IL_0014: ldc.r8    10
+		/* 0x00000279 7D02000004   */ IL_001D: stfld     float64 StructVsClass.DataStruct::Salary
+		/* 0x0000027E 08           */ IL_0022: ldloc.2
+		/* 0x0000027F 0A           */ IL_0023: stloc.0
+		/* (10,14)-(10,68) C:\Users\fenga\workspace\DotNetMemoryBenchmark\StructVsClass\Program.cs */
+		/* 0x00000280 7303000006   */ IL_0024: newobj    instance void StructVsClass.DataClass::.ctor()
+		/* 0x00000285 25           */ IL_0029: dup
+		/* 0x00000286 1F14         */ IL_002A: ldc.i4.s  20
+		/* 0x00000288 7D03000004   */ IL_002C: stfld     int32 StructVsClass.DataClass::Age
+		/* 0x0000028D 25           */ IL_0031: dup
+		/* 0x0000028E 230000000000002440 */ IL_0032: ldc.r8    10
+		/* 0x00000297 7D04000004   */ IL_003B: stfld     float64 StructVsClass.DataClass::Salary
+		/* 0x0000029C 0B           */ IL_0040: stloc.1
+		/* (11,9)-(11,10) C:\Users\fenga\workspace\DotNetMemoryBenchmark\StructVsClass\Program.cs */
+		/* 0x0000029D 2A           */ IL_0041: ret
+```
+
+`initbj` 表明在栈上分配空间，而 `newobj` 是堆上分配空间。在栈空间分配空间的话，内存空间管理就交给程序栈管理，而在堆上分配就需要 GC 来管理。除此之外，使用值类型还有以下几点好处：
+- 值类型只存储数据而没有其他的元数据
+- 值类型数据是紧密存储，有很好的局部性
+- 没有 dereference，所以访问值类型更快
+- 值类型可以使用按值传递机制，实现不可变性。
+
+接下来通过 benchmark 查看两者在性能上的差距
+
+```C#
+[Benchmark]
+public List<string> UseDataClass()
+{
+    int amount = Amount;
+    LocationClass location = new LocationClass();
+    List<string> result = new List<string>();
+    List<PersonDataClass> input = service.GetPersonInBatchClasses(amount);
+    DateTime now = DateTime.Now;
+    for(int i = 0; i < input.Count; i++)
+    {
+        PersonDataClass item = input[i];
+        if(now.Subtract(item.BirthDate).TotalDays > 18 * 365)
+        {
+            var employee = service.GetEmployeeClass(item.EmployeeId);
+            if(locationService.DistanceWithClass(location, employee.Address) < 10.0)
+            {
+                string name = $"{item.Firstname} {item.Lastname}";
+            result.Add(name);
+            }
+        }
+    }
+    return result;
+}
+
+[Benchmark]
+public List<string> UseDataStruct()
+{
+    int amount = Amount;
+    LocationStruct location = new LocationStruct();
+    List<string> result = new List<string>();
+    InputDataStruct[] input = service.GetPersonInBatchStructs(amount);
+    DateTime now = DateTime.Now;
+    for(int i = 0; i < input.Length; i++)
+    {
+        ref InputDataStruct item = ref input[i];
+        if(now.Subtract(item.BirthDate).TotalDays > 18 * 365)
+        {
+            var employee = service.GetEmployeeStruct(item.EmployeeId);
+            if(locationService.DistanceWithStruct(ref location, employee.Address) < 10.0)
+            {
+                string name = $"{item.Firstname} {item.Lastname}";
+                result.Add(name);
+            }
+        }
+    }
+    return result;
+}
+```
+
+结果如下：
+
+|        Method | Amount |     Mean |    Error |    StdDev |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|-------------- |------- |---------:|---------:|----------:|-------:|-------:|------:|----------:|
+|  UseDataClass |    200 | 37.84 us | 2.484 us | 0.6451 us | 3.0518 | 0.0610 |     - |  12.59 KB |
+| UseDataStruct |    200 | 40.71 us | 1.961 us | 0.5091 us | 1.8921 |      - |     - |   7.87 KB |
+
+在时间消耗上两者差距不大，但是在使用值类型的方法在内存使用有较大优势，内存分配几乎只有前者的 60%。
+
+## 2.2 使用 ValueTuple
+
+很多时候我们需要返回多个字段，通常采用返回一个 `Tuple` 或者匿名对象，但是他们都是引用类型。因此在 C# 中引入了 Value Tuple. 使用也非常简单：
+
+```C#
+var tuple1 = (1, 4.0);
+var tuple2 = (A: 1, B: 4.0);
+tuple2.A = 2;
+```
+接下来通过例子比较两者的在内存分配上的差异：
+
+```C#
+[Benchmark]
+public Tuple<ResultDesc, ResultData> ReturnTuple()
+{
+    return new Tuple<ResultDesc, ResultData>(new ResultDesc {Count = 10}, new ResultData(){Average=0.0, Sum = 10.0});
+            
+}
+
+[Benchmark]
+public (ResultDescStruct, ResultDataStruct) ReturnValueTuple()
+{
+    return (new ResultDescStruct(){Count=10}, new ResultDataStruct(){Average = 0.0, Sum = 10.0});
+}
+```
+
+结果如下：
+
+|           Method |      Mean |     Error |    StdDev |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|----------------- |----------:|----------:|----------:|-------:|------:|------:|----------:|
+|      ReturnTuple | 11.083 ns | 1.5716 ns | 0.4081 ns | 0.0210 |     - |     - |      88 B |
+| ReturnValueTuple |  4.536 ns | 0.2652 ns | 0.0689 ns |      - |     - |     - |         - |
+
+使用 `ValueTuple` 在时间和内存消耗上有着显著的优势。
 
 # 3 隐藏内存分配
 

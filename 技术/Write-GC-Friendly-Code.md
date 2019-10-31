@@ -336,6 +336,321 @@ public (ResultDescStruct, ResultDataStruct) ReturnValueTuple()
 
 使用 `ValueTuple` 在时间和内存消耗上有着显著的优势。
 
+## 2.3 使用 ArrayPool
+
+很多情况下我们会多次使用数组，那么为何不将这些数组缓存起来，使它们不被 GC 所回收，这样就减轻了 GC 的压力。`System.Buffer` 包提供了 ArrayPool 相应的功能，基本用法如下：
+
+```C#
+int[] buffer = ArrayPool.Shared.Rent(miniLength);
+try
+{
+    consume(buffer)
+}
+finally
+{
+    ArrayPool.Shared.Return(buffer);
+}
+```
+
+在之前值类型和引用的类型比较中，再增加一个 ArrayPool 比较:
+
+```C#
+//elide
+[GlobalSetup]
+public void Setup()
+{
+    var array = ArrayPool<InputDataStruct>.Shared.Rent(Amount);
+    ArrayPool<InputDataStruct>.Shared.Return(array);
+}
+// elide
+
+[Benchmark]
+public List<string> PeopleEmployeeWithInLocation_ArrayPoolStructs()
+{
+    int amount = Amount;
+    LocationStruct location = new LocationStruct();
+    List<string> result = new List<string>();
+    InputDataStruct[] input = service.GetDataArrayPoolStructs(amount);
+    DateTime now = DateTime.Now;
+    for(int i = 0; i < input.Length; i++)
+    {
+        ref InputDataStruct item = ref input[i];
+        if(now.Subtract(item.BirthDate).TotalDays > 18 * 365)
+        {
+            var employee = service.GetEmployeeStruct(item.EmployeeId);
+            if(locationService.DistanceWithStruct(ref location, employee.Address) < 10.0)
+            {
+                string name = $"{item.Firstname} {item.Lastname}";
+                        result.Add(name);
+            }
+        }
+    }
+    ArrayPool<InputDataStruct>.Shared.Return(input);
+    return result;
+}
+```
+
+`Setup` 方法使 ArrayPool 提前创建好，以便后续的 `Rent` 调用的时候不需要再一次申请内存分配，Benchmark 得到的结果如下：
+
+|              Method | Amount |     Mean |    Error |    StdDev |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|-------------------- |------- |---------:|---------:|----------:|-------:|------:|------:|----------:|
+|        UseDataClass |    200 | 39.04 us | 3.724 us | 0.9672 us | 3.0518 |     - |     - |  12.59 KB |
+|       UseDataStruct |    200 | 40.48 us | 1.941 us | 0.5042 us | 1.8921 |     - |     - |   7.87 KB |
+| UseArrayPoolStructs |    200 | 40.94 us | 1.465 us | 0.3804 us | 0.2441 |     - |     - |   1.12 KB |
+
+
+## 使用对象池
+
+对象池概念已经被广泛使用，比如数据库连接池，每次数据库操作并不需要重新建立一个连接，只需要选择空闲的数据库连接对象即可。有很多现成库可以选择，比如：[CodeProject.ObjectPool](https://www.nuget.org/packages/CodeProject.ObjectPool)，手动实现对象池也并不是很困难。
+
+```C#
+public class Object<T> Where T : class
+{
+    private T firstItem;
+    private readonly T[] items;
+    private readonly Func<T> generator
+
+    public ObjectPool(Func<T> generator, int size)
+    {
+        this.generator = generator ?? throw new ArgumentNullException("genertor");
+        this.items = new T[size-1];
+    }
+
+    public T Rent()
+    {
+        T inst = firstItem;
+        if (inst == null || inst != Interlocked.CompareExchange(ref firstItem, null, inst))
+        {
+            inst = RentSlow();
+        }
+        return inst;
+    }
+    public void Return(T item)
+    {
+        if(firstItem == null)
+        {
+            firstItem = item;
+        }
+        else
+        {
+            ReturnSlow(item);
+        }
+    }
+    private T RentSlow()
+    {
+        for (int i = 0; i < items.Length; i++)
+        {
+            T inst = inst[i];
+            if (inst != null)
+            {
+                if(inst == Interlocked.ComparedExchange(ref items[i], null, inst))
+                {
+                    return inst;
+                }
+            }
+        }
+        return generator();
+    }
+
+    private void ReturnSlow(T obj)
+    {
+        for(int i =0; i < items.Length; i++)
+        {
+            if(items[i] == null)
+            {
+                items[i] = obj;
+                break;
+            }
+        }
+    }
+}
+```
+
 # 3 隐藏内存分配
+
+除了显示使用 `new` 分配内存之外，还有一些隐藏的内存分配情况。
+
+## 3.1 委托
+
+我们代码中包含了大量的委托 `Action`, `Func` 等等，通常为一个委托赋值的方法有一下几种：
+
+```C#
+Func<double> action1 = ProgressWithLogging;
+Func<double> action2 = new Func<double>(ProgressWithLogging);
+Func<double> action3 = () => ProgressWithLogging();
+Func<double> action4 = () => 1.0;
+```
+除了第一种显式使用了 `new` 来分配一个委托，剩下的三种其实都包含了隐藏的内存分配，相关 IL 代码如下：
+
+```IL
+/* 0x0000025E FE0602000006 */ IL_0002: ldftn     float64 DelegateAlloc.Program::ProgressWithLogging()
+/* 0x00000264 730C00000A   */ IL_0008: newobj    instance void class [System.Runtime]
+
+/* elide */
+/* 0x0000026B FE0602000006 */ IL_000F: ldftn     float64 DelegateAlloc.Program::ProgressWithLogging()
+/* 0x00000271 730C00000A   */ IL_0015: newobj    instance void class [System.Runtime]System.Func`1<float64>::.ctor(object, native int)
+/* elide */
+/* 0x00000285 FE0606000006 */ IL_0029: ldftn     instance float64 DelegateAlloc.Program/'<>c'::'<Main>b__0_0'()
+/* 0x0000028B 730C00000A   */ IL_002F: newobj    instance void class [System.Runtime]System.Func`1<float64>::.ctor(object, native int)
+/* elide */
+/* 0x000002A5 FE0607000006 */ IL_0049: ldftn     instance float64 DelegateAlloc.Program/'<>c'::'<Main>b__0_1'()
+/* elide */
+/* 0x000002AB 730C00000A   */ IL_004F: newobj    instance void class [System.Runtime]System.Func`1<float64>::.ctor(object, native int)
+```
+
+每个委托赋值语句都转换为 `newobj` 语句，即堆内存分配操作。
+
+## 3.2 装箱
+
+装箱是指在值类型和引用类型之间的相互转换，.Net 官方文档是这么说的
+
+> 每一个值类型都有相应的引用类型，叫做装箱类型；反过来却不成立，装箱后的引用类型存储了转换之前值类型的值。
+
+当函数或者方法接受的是引用类型，而传递给的参数却是值类型，那么就会引发装箱操作。装箱带来了内存的分配，因此是非常耗时的操作，接下来使用 Benchmark 查看装箱带来的性能损失。
+
+```C#
+[Benchmark]
+public void UseBox()
+{
+    for(int i =0; i < 100; i ++)
+    {
+        Box(i);
+    }
+}
+
+[Benchmark]
+public void UnBox()
+{
+    for(int i =0; i < 100; i++)
+    {
+        Unbox(i);
+    }
+}
+
+public int Box(object obj)
+{
+    return (int)obj;
+}
+
+public int Unbox(int i)
+{
+    return i;
+}
+```
+
+结果如下：
+
+| Method |      Mean |      Error |    StdDev |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|------- |----------:|-----------:|----------:|-------:|------:|------:|----------:|
+| UseBox | 288.16 ns | 16.9930 ns | 4.4130 ns | 0.5736 |     - |     - |    2400 B |
+|  UnBox |  30.16 ns |  0.1829 ns | 0.0475 ns |      - |     - |     - |         - |
+
+
+不管是时间还是空间效率上，装箱操作都带来不小的性能损失。如果方法接受的参数是接口类型，但是我们传入的是值类型，同样也会引起装箱操作。
+
+```C#
+interface ITuple
+{
+    int Length();
+}
+
+class TupleStruct : ITuple
+{
+    public int Length()
+    {
+        return 1;
+    }
+}
+
+// elide
+class Program
+{
+    static void Main(string[] args)
+    {
+        TupleStruct ts = new TupleStruct();
+        FooBar(ts);
+    }
+
+    static int FooBar(ITuple tuple)
+    {
+        return tuple.Length();
+}
+```
+
+相应的 IL 代码如下:
+
+```IL
+/* elide */
+/* 0x0000025D 7306000006   */ IL_0001: newobj    instance void StructInteface.TupleStruct::.ctor()
+/* 0x00000262 0A           */ IL_0006: stloc.0
+/* (10,13)-(10,24) C:\Users\fenga\workspace\DotNetMemoryBenchmark\StructInteface\Program.cs */
+/* 0x00000263 06           */ IL_0007: ldloc.0
+/* 0x00000264 2802000006   */ IL_0008: call      int32 StructInteface.Program::FooBar(class StructInteface.ITuple)
+/* elide */
+```
+
+使用泛型和类型约束可以避免装箱操作
+
+```C#
+void FooBar<T>(T obj)
+{
+
+}
+
+void FooBar<T>(T tuple) where T: ITuple
+{
+
+}
+```
+
+除此之外，值类型下面的情况也会导致装箱操作：
+
+1. 在值类型没有重写 `GetHashCode()` 和 `ToString()` 方法，如果方法中使用了这些方法，也会导致装箱。
+2. 使用 `GetType()` 方法总会导致装箱操作。
+3. 从值类型方法中创建委托。
+
+## 3.3 闭包
+
+闭包是一种获取执行环境状态的一种机制，比如下面的例子
+
+```C#
+private IEnumnerable<string> Closures(int value)
+{
+    var filteredList = _list.Where(x => x > value);
+    var result = filteredList.Select(x => x.ToString());
+    return result;
+}
+```
+通过之前了解到的，`Where` 和 `Select` 的参数都是委托，所以就会有两次对象分配。但是还有个对象分配并不起眼，就是为闭包创建的一个类，它包含了传入的参数 `value`。编译转换后的代码如下：
+
+```C#
+private IEnumerable<string> Closure(int value)
+{
+    Program.<>c__DisplayClass1_0 <>c__DisplayClass1_ = new Program.<>c__DisplayClass1_0();
+    <>c__DisplayClass1_.value = value;
+    IEnumberable<int> arg_43_0 = this._list.Where(new Func<int, bool>(<>c__DisplayClass1_.<Clousure>b_0));
+    Func<int, string> arg_43_1;
+    if((arg_43_1 = Program.<>c.<>9__1_1) == null)
+    {
+        arg_43_1 = (Program.<>c.<>9__1_1 = new Func<int, string>(Program.<>c.<>9.<Clousures>b__1_1);
+    }
+    return arg_43_0.Select(arg_43_1);
+}
+
+[CompilerGenerated]
+private sealed class <>c__DisplayClass1_0
+{
+    public <>C__DisplayClass1_0()
+    {
+
+    }
+    internal bool <Clousure>b__0(int x)
+    {
+        return x > this.value;
+    }
+    public int value;
+}
+```
+类 `<>c__DisplayClass1_0` 就是编译器帮我们创建好的类，它包含了传我们传入的参数，并提供了委托所需要的方法。每次调用 `Closure` 方法的时候，都会引起这个类在堆空间上的分配。
 
 # 4 隐藏库函数内存分配

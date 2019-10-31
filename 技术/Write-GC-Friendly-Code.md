@@ -1,7 +1,7 @@
 ---
 title: DotNet 高效代码
 date: 2019-10-27
-status: draft
+status: public
 ---
 
 # 1 工具
@@ -653,4 +653,66 @@ private sealed class <>c__DisplayClass1_0
 ```
 类 `<>c__DisplayClass1_0` 就是编译器帮我们创建好的类，它包含了传我们传入的参数，并提供了委托所需要的方法。每次调用 `Closure` 方法的时候，都会引起这个类在堆空间上的分配。
 
-# 4 隐藏库函数内存分配
+## 3.4 参数数组
+
+从 C# 2.0 开始提供了 `params` 关键字，它允许我们传入可变的调用参数。但是要注意的是这个仅仅是一个语法糖，其实编译器为我们创建了一个对象数组。
+
+```C#
+public void MethodWithParams(string str, params object[] args)
+{
+    Console.WriteLine(str, args);
+}
+```
+
+为了避免额外的内存分配，可以选择不同的参数的方法重载。
+
+```C#
+public void MethodWithParams(string str, object arg1)
+{
+    // elide
+}
+public void MethodWithParams(string str, object arg1, object args2)
+{
+    // elide
+}
+```
+
+## 3.5 IEnumbeable<T> 参数
+
+很多代码设计的规则要求面向接口编程，比如我们的方法的参数和返回值都应当是接口类型，比如：
+
+```C#
+public int Sum(IEnumerable<Person> persons)
+{
+    //elide
+}
+
+List<Person> list = new List<Person>();
+// elide
+Sum(list);
+```
+
+`Sum` 方法接受的参数类型接口 `IEnumerable<Person>`，List<T> 实现了这个接口，所以将 List 类型传入是没有问题。但是如果查看 `List` 对这个接口的实现，发现它是返回一个 `Enumerator` 对象。
+
+```C#
+public List<T> 
+{
+    //elide
+
+    public Enumerator GetEnumerator()
+            => new Enumerator(this);
+
+    IEnumerator<T> IEnumerable<T>.GetEnumerator()
+            => new Enumerator(this);
+
+    //elide
+
+    public struct Enumerator : IEnumerator<T>, IEnumerator
+    {
+        //elide
+    }
+
+}
+```
+
+可以看出 `Enumerator` 是值类型，根据之前的讨论，这将引起装箱操作，当然这也说明工程上并非仅仅只是性能作为考虑，而是一种平衡的结果。

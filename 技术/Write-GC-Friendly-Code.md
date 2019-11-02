@@ -8,11 +8,11 @@ status: public
 
 > 工欲善其事，必先利其器
 
-好的工具才有助于我们写出高性能的 C# 代码，也能证明我们的代码是高效无误。[dnSpy](https://github.com/0xd4d/dnSpy) 和 [BenchmarkDotNet](jttps://github.com/dotnet/BenchmarkDotNet) 就是这样的工具。
+好的工具有助于我们写高效的 C# 代码，[dnSpy](https://github.com/0xd4d/dnSpy) 和 [BenchmarkDotNet](jttps://github.com/dotnet/BenchmarkDotNet) 就是不错的选择。
 
 ## 1.1 dnSpy
 
-众所周知，C# 代码都会被转换成 IL (Intermediate Language) 代码，然后被运行时 (Runtime) 执行，目前使用的运行时主要有 .Net Framework, CoreCLR 和 Mono。通过查看 IL 可以知道我们的 C# 代码在编译器作用下生成怎样的代码，使用 dnSpy 可以将生成的 dll 或者 exe 文件反编译成相应的 IL 代码。
+众所周知，C# 代码都会编译成 IL (Intermediate Language) 代码，然后被运行时 (Runtime) 执行，目前使用的运行时主要有 .Net Framework, CoreCLR 和 Mono。通过查看 IL 可以知道 C# 代码在编译器作用下会生成怎样的代码，使用 dnSpy 可以将生成的 dll 或者 exe 文件查看成相应的 IL 代码。
 
 ```C#
 using System;
@@ -28,11 +28,11 @@ namespace HelloWorld
 }
 ```
 
-这是最简单的 Hello World 控制台应用程序，使用 `dotnet build` 命令编译生成 HelloWorld.dll 或者 HelloWorld.exe，这是最小可执行程序。使用 dnSpy 查看编译器究竟为我们生成了怎样的 IL 代码。
+这是最简单的 Hello World 控制台应用程序，使用 `dotnet build` 命令生成 HelloWorld.dll 或者 HelloWorld.exe，这是最小可执行程序，使用 dnSpy 查看编译器究竟为我们生成了怎样的 IL 代码。
 
 ![dnSpy](./_image/dnSpy_Snapshot.png)
 
-文件打开生成的 HelloWorld.dll, 选择 Program 类的 Main 方法，右边就会显示出相应的 IL 代码。IL 是基于栈机器（Stack Machine)，所有的操作基本上可以归结于进栈（Push）和出栈（Push)，比如 Main 函数中执行逻辑可以这样描述：
+文件打开生成的 HelloWorld.dll, 选择 Program 类的 Main 方法，右边就会显示出相应的 IL 代码。IL 是基于栈机器（Stack Machine)，基本上所有的操作可以归结于进栈（Push）和出栈（Push)，比如 Main 函数中执行逻辑可以这样描述：
 
 1. nop 无操作，主要是为了指令对齐
 2. ldstr 将字符串 "Hello World" 进行入栈
@@ -85,7 +85,7 @@ public class Program
 }
 ```
 
-带有 `Benchmark` Attribute 的方法就是我们要进行测试的方法，里面就是具体实现方式；而 `BenchmarkRunner` 则是 Benchmark 的入口。使用 `dotnet run` 就可以在控制台得到全部的运行结果。现在我们测试斐波那契数列迭代和递归的两种不同方式性能差异。
+带有 `Benchmark` Attribute 的方法就是要进行测试的方法，里面就是具体实现方式；而 `BenchmarkRunner` 则是 Benchmark 的入口。使用 `dotnet run` ~~就可以在控制台运行然后得到运行结果~~。现在我们测试斐波那契数列迭代和递归的两种不同方式性能差异。
 
 ```C#
 [SimpleJob(launchCount:1, warmupCount:2, targetCount:5)]
@@ -145,7 +145,7 @@ public class MyBenchmark
 
 ### 1.2.3 内存监控
 
-除了时间运行效率，我们还需要关注内存使用情况，这一点 BenchmarkDotNet 也提供了相关的工具，只需要增加 `MemoryDiagnoser` attribute 即可。
+除了时间运行效率，我们还需要关注内存使用情况，这一点 BenchmarkDotNet 也提供了相应的功能，只需增加 `MemoryDiagnoser` attribute 即可。
 
 ```C#
 [SimpleJob(launchCount:1, warmupCount:2, targetCount:5)]
@@ -176,7 +176,7 @@ public class MyBenchmark
 
 ## 2.1 值类型
 
-和 Java 语言不同，用户自定义类型除了引用类型（class)，用户还可以定义值类型（struct)。对于值类型，很多人都存在这样这样的误解：
+和 Java 语言不同，在 C# 中，用户自定义类型除了引用类型（class)，还可以定义值类型（struct)。对于值类型，很多人都存在这样这样的误解：
 
 > 值类型分配在栈上，而引用类型定义分配在堆上
 
@@ -303,7 +303,7 @@ public List<string> UseDataStruct()
 
 ## 2.2 使用 ValueTuple
 
-很多时候我们需要返回多个字段，通常采用返回一个 `Tuple` 或者匿名对象，但是他们都是引用类型。因此在 C# 中引入了 Value Tuple. 使用也非常简单：
+很多时候我们需要返回多个字段，通常采用返回一个 `Tuple` 或者匿名对象，但是它们都是引用类型。在 C# 中引入了 Value Tuple. 使用也非常简单：
 
 ```C#
 var tuple1 = (1, 4.0);

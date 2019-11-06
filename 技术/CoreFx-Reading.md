@@ -9,6 +9,31 @@ title: coreFx 源码阅读
 
 ## 1.1 List
 
+`List<T>` 是数组的封装，能够自动完成数组大小的扩容，默认大小为 `4`，每次扩容数组大小翻倍。
+
+```C#
+public class List<T>
+{
+    private const int DefaultCapacity = 4;
+    private T[] _items;
+    private int _size;
+    private int _version;
+    // elide
+
+    private void EnsureCapacity(int min)
+    {
+        if(_item.Length < min)
+        {
+            int newCapacity = _items.Length == 0 ? DefaultCapacity : _item.Length * 2;
+            // elide
+            Capacity = newCapacity;
+        }
+    }
+}
+```
+
+任何堆列表的修改（增加和删除）都会引起 `_version` 字段自增，那么在任何枚举的过程中都会检查 `_version` 是否发生改变，一旦发生改变表明有存在别的线程对队列进行的修改，这个对于非线程安全的列表非常重重要。
+
 ## 1.2 Hashtable
 
 ## 1.3 Dictionary

@@ -32,11 +32,45 @@ public class List<T>
 }
 ```
 
-任何堆列表的修改（增加和删除）都会引起 `_version` 字段自增，那么在任何枚举的过程中都会检查 `_version` 是否发生改变，一旦发生改变表明有存在别的线程对队列进行的修改，这个对于非线程安全的列表非常重重要。
+任何堆列表的修改（增加和删除）都会引起 `_version` 字段自增，那么在任何枚举的过程中都会检查 `_version` 是否发生改变，一旦发生改变表明有存在别的线程对队列进行的修改，这个对于非线程安全的列表非常重要。
 
-## 1.2 Hashtable
+## 1.2 哈希表
 
-## 1.3 Dictionary
+哈希表是一种高效的数据结构，通过空间换取时间上的效率，操作的时间复杂度为 `O(1)` 。一旦发生键冲突，就需要采取相应的措施来解决，所以好的哈希函数能够将键充分散开。但是冲突也无法避免，通常采用的方法有开放定址法和链表发，`.Net core` 中 `Hashtable` 和 `Dictionary` 分别采用着两种方法。
+
+### 1.2.1 Hashtable
+何为开放定址法呢？也就是说当某个键在计算得到待插入位置的时候发现已经被占用，再此基础上重新计算待插入的位置，如此循环直到发现有空余的位置。
+
+```C#
+public class Hashtable
+{
+    private struct bucket
+    {
+        public object? key;
+        public object? value;
+        public int hash_coll;
+    }
+
+    private bucket[] _buckets = null;
+
+    //elide
+}
+```
+
+`Hashtable` 是非泛型容器，`Key` 和 `Value` 都是 `object` 类型，但是要求 `key` 必须实现 `GetHashCode` 和 `Equals` 方法，而且对于同一个 `key` 对象两个方法返回的值必须一致，某一种意义上将 `key` 是不可变类型，至少计算 `GetHashCode` 和 `Equals` 方法的字段不能修改。`key` 和 `value` 组成一个 `bucket`， 而 `hash_coll` 字段保存该 `key` 计算出来的哈希值，但是如果该值为负值，表明该位置为空，在 `Hashtable` 内部包含一个 `Bucket` 数组。
+~~~~
+```C#
+private uint InitHash(object key, int hashsize, out uint seed, out uint incr)
+{
+    unint hashcode = (uint)GetHash(key) & 0x7FFFFFFF;
+    seed = (uint)hashcode;
+    incr = (uint)(1 + ((seed * HashHelper.HashPrime) % ((uint)hashsize -1)));
+    return hashcode;
+}
+```
+
+
+### 1.2.2 Dictionary
 
 ## 1.4 ConcurrentQueue
 

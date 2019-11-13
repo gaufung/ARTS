@@ -58,7 +58,8 @@ public class Hashtable
 ```
 
 `Hashtable` 是非泛型容器，`Key` 和 `Value` 都是 `object` 类型，但是要求 `key` 必须实现 `GetHashCode` 和 `Equals` 方法，而且对于同一个 `key` 对象两个方法返回的值必须一致，某一种意义上将 `key` 是不可变类型，至少计算 `GetHashCode` 和 `Equals` 方法的字段不能修改。`key` 和 `value` 组成一个 `bucket`， 而 `hash_coll` 字段保存该 `key` 计算出来的哈希值，但是如果该值为负值，表明该位置为空，在 `Hashtable` 内部包含一个 `Bucket` 数组。
-~~~~
+
+
 ```C#
 private uint InitHash(object key, int hashsize, out uint seed, out uint incr)
 {
@@ -69,6 +70,98 @@ private uint InitHash(object key, int hashsize, out uint seed, out uint incr)
 }
 ```
 
+首先计算出 `hash` 值并与 `0x7FFFFFFF` 来保证最高位为 0，确保该位置的 `bucket` 被目前已经被占用。然后计算出 `seed` 和 `incr` 来表示开始位置和冲突时候下次计算位置的增量。
+
+```C#
+private void Insert(object key, object? nvalue, bool add)
+{
+    //elide
+    uint seed;
+    uint incr;
+    uint hashcode = InitHash(key, _buckets.Length, out seed, out incr);
+    int emptySlotNumber = -1;
+    int bucketNumber = (int)(seed % (uint)_bucket.Length);
+    do{
+        if(emptySlotNumber == -1 && (_bucket[bucketNumber].key == _bucket) && (_bucket[bucketNumber].hash_coll < 0))
+        {
+            emptySlotNumber = bucketNumber;
+        }
+        
+        if((_bucket[bucketNumber].key==null) || (_bucket[bucketNumber].key==_bucket)
+            && ((_buckets[bucketNumber].hash_col & unckecked(0x80000000)) == 0))
+            {
+                _buckets[bucketNumber].val = nvalue;
+                _buckets[bucketNumber].key = key;
+                _buckets[bucketNumber].hash_coll |= (int)hashcode;
+                return;
+            }
+        if((_buckets[bucketsnumber].hash_coll & 0x7FFFFFFF) == hashcode) && KeyEquals(_buckets[bucketNumber].Key, key))
+        {
+            if(add)
+            {
+                throw new ArugumentException();
+            }
+            _bucket[bucketNumber].val = nvalue;
+            return
+        }
+        if(emptySlotNumber == -1)
+        {
+            _bucket[bucketNumber].hash_coll 1= unchecked((int)0x80000000)
+            //elide
+        }
+        bucketNumebr = (int)(((long)bucketNumber + incr) % (uint)_buckets.Length);
+    }while(++ntry < _buckets.Length)
+    //elide
+    if(emptySlotNumber != -1)
+    {
+        //elide
+        _bucket[emptySlotNumber].val = nvalue;
+        _bucket[emptySlotNumber].key = key;
+        _bucket[emptySlotNumber].hash_coll |= (int)hashcode;
+        //elide
+    }
+}
+```
+
+每一个 `bucket` 可能存在如下三种情况：
+
+1. 该位置为空，从未设置过：key 为 null，val 为 null 并且 hash_coll 也为 0;
+2. 该位置设置被设置，key 和 value 为相应值，hash_coll 为 key 计算出来的 hash 值，如果发生冲突则将最高位设置为 1， 也就是该值为复数;
+3. 该位置为可插入位置，如果之前设置为冲突，则该位置的 key 为全体 `_buckets`，而 `value` 为 `null` 而 hash_coll 仍然保持为负数，如果没有冲突保存原本 hash 值。
+
+在插入过程中，首先计算出 `bucketNumber`， 如果首先发现当前 `bucket` 是第 3 种有冲突情况，则将值保存在 `emptySlotNumber` 中进行下一轮循环，找到所有的可能的冲突。如果发现是第 3 种情况中没有冲突的或者第 1 中情况，直接将 key，value 进行赋值，但是如果发现之前有冲突空位置，则优先选择冲突位置。如果是第 2 种情况，那么将其中的 value 进行更新。剩余的情况则将该位置的 `hash_coll` 标志位设置为冲突。
+
+```C#
+public virtual void Remove(object key)
+{
+    uint seed;
+    uint incr;
+    uint hashcode = InitHash(key, _bucket.Length, out seed, out incr);
+    int ntry = 0;
+    bucket b;
+    int bn = (int)(seed % (uint)_buckets.Length);
+    do
+    {
+        b = _buckets[bn];
+        if((b.hash_coll & 0x7FFFFFFF) == hashcode) && KeyEquals(b.Key, key))
+        {
+            _buckets[bn].hash_coll &= unchecked((uint)0x8000000);
+            if(_bcukets[bn].hash_coll != 0)
+            {
+                _buckets[bn].Key = _buckets;
+            }
+            else
+            {
+                _buckets[bn].key = null;
+            }
+            _buckets[bn].val = null;
+            //elide
+        }
+        bn = (int)(((long)bn + incr) % (uint)_buckets.Length);
+    }while(b.hash_coll <0 && ++ntry < _buckets.Length)
+}
+```
+删除过程就比较简单了，首先找到哈希值和键都相同的 `bucket`, 然后清除 `bucket` 的 `hash_coll`, 如果清除后不等于 0， 则索命该位置之前是冲突的，否则将 key 设置为 null。
 
 ### 1.2.2 Dictionary
 

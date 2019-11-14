@@ -165,6 +165,86 @@ public virtual void Remove(object key)
 
 ### 1.2.2 Dictionary
 
+`Dictionary` 是哈希表的泛型表示，而且与 `hashtable` 有不同的实现方式。
+
+```C#
+public class Dictionary<TKey, TValue>
+{
+    private struct Entry
+    {
+        public int next;
+        public uint hashcode;
+        public Tkey key;
+        public TValue Value;
+    }
+
+    private int[]? _buckets;
+    private Entry[]? _entries;
+    private int _freeList;
+    //elide
+    private const int StartOffFreeList = -3;
+}
+```
+
+在这里使用两层映射关系，`_buckets` 为整型数组，而 `_entries` 保存 `key-value` 数组，它存放的是 `Entry` 结构体类型，其中 `next` 字段比较特殊，采用连接表的方式，将发生冲突的键串联起来。`next` 指向下一个键值对的索引位置，如果该值为 `-1` 表明是冲突链最后一个。如果在删除的时候出现空洞，那么空洞起始索引由 `_freeList` 指向，并且 `next` 表明下一个空洞的位置。具体示意图如下
+
+![](_image/dictionary.PNG)
+
+需要注意的 `_bucket` 数组种值减去 1 才是 `_entries` 数组的索引。
+
+```C#
+private bool TryInsert(TKey key, TValue value, InsertionBehavior behavior)
+{
+    //elide
+    uint hashcode = key!.GetHashCode();//elide;
+    ref int bucket = ref _buckets[hashcode % (uint)_bucket.Length];
+    int i = bucket - 1;
+    if(comparer == null)
+    {
+        //elide
+        do
+        {
+            if((uint)i >= (uint)entres.Length)
+            {
+                break;
+            }
+            if(entries[i].hashcode == hashcode && EqualityCompare<TKey>.Default.Equals(entries[i].key, key))
+            {
+                //elide
+                entries[i].value = value;
+                //elide
+            }
+            i = entries[i].next;
+            //elide
+        }while(true);
+    }
+    //elide
+    bool updateFreeList = false;
+    int index;
+    if(_freeCount > 0)
+    {
+        index = _freeList;
+        updateList = true;
+        _freeCount--;
+    }
+    else
+    {
+        int count == _count;
+        //elide
+        index= count;
+        //elide
+    }
+    //elide
+    entry.hashcode = hashcode;
+    entry.next = bucket - 1;
+    entry.key = key;
+    bucket = index + 1;
+    //elide
+}
+```
+
+首先从 `_buckets` 从获取在 `_entries` 的索引，一旦 `(uint)i >= (uint)entries.Length` 就退出循环表明已经到达链表最后一个；但是如果发现 `hash` 值和 `key` 都相同，表明已经找到相应位置；否则将 `next` 更新给 `i` 去判断下一个 `entry`。 在判断没有已有合适位置之后，首先查看是否有之前删除导致的空洞，如果有，则填充之前的空洞。否则在 `entry` 数组最上面添加一个，记住要更新相应的 `next` 字段，并且将从 `bucket` 指向过来的值更新为当前新插入的索引。
+
 ## 1.4 ConcurrentQueue
 
 `ConcurrentQueue` 是线程安全的队列，用来实现最常见的生产者消费者模式，所以最重要的就是 `Enqueue` 和 `Dequeue` 接口。在 `coreFx` 中具体实现在 [ConcurrentQueueSegment.cs](https://github.com/dotnet/corefx/blob/master/src/Common/src/CoreLib/System/Collections/Concurrent/ConcurrentQueueSegment.cs) 和 [ConcurrentQueue.cs](https://github.com/dotnet/corefx/blob/master/src/Common/src/CoreLib/System/Collections/Concurrent/ConcurrentQueue.cs) 两个文件中。
